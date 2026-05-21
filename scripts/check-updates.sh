@@ -87,7 +87,8 @@ if have curl; then
   else
     installer_status="unreachable"
   fi
-  if curl -fsIL "https://codeload.github.com/${REPO_SLUG}/tar.gz/refs/heads/${BRANCH}" >/dev/null 2>&1; then
+  codeload_ref="${latest_revision:-refs/heads/${BRANCH}}"
+  if curl -fsIL "https://codeload.github.com/${REPO_SLUG}/tar.gz/${codeload_ref}" >/dev/null 2>&1; then
     codeload_status="ok"
   else
     codeload_status="unreachable"

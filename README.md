@@ -15,8 +15,10 @@ macOS 本机 Codex.app 账号池切换方案。它面向已经使用 `codex-auth
 ## Install
 
 ```bash
-tmp="$(mktemp -d)" \
-  && curl -fsSL https://codeload.github.com/tytsxai/codex-app-account-switcher/tar.gz/refs/heads/main \
+repo="tytsxai/codex-app-account-switcher" \
+  && sha="$(curl -fsSL "https://api.github.com/repos/$repo/commits/main" | sed -n 's/.*"sha": *"\([0-9a-f]\{40\}\)".*/\1/p' | head -n 1)" \
+  && tmp="$(mktemp -d)" \
+  && curl -fsSL "https://codeload.github.com/$repo/tar.gz/$sha" \
   | tar -xz -C "$tmp" --strip-components 1 \
   && bash "$tmp/scripts/install.sh"
 ```

@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_SLUG="${REPO_SLUG:-tytsxai/codex-app-account-switcher}"
 BRANCH="${BRANCH:-main}"
-REPO_TARBALL_URL="${REPO_TARBALL_URL:-https://github.com/${REPO_SLUG}/archive/refs/heads/main.tar.gz}"
+REPO_TARBALL_URL="${REPO_TARBALL_URL:-}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/share/codex-app-account-switcher}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
 DESKTOP_SHORTCUT=1
@@ -18,7 +18,7 @@ Usage:
 Environment:
   REPO_SLUG=tytsxai/codex-app-account-switcher
   BRANCH=main
-  REPO_TARBALL_URL=https://github.com/tytsxai/codex-app-account-switcher/archive/refs/heads/main.tar.gz
+  REPO_TARBALL_URL=<optional explicit tarball URL>
   INSTALL_DIR=~/.local/share/codex-app-account-switcher
   BIN_DIR=~/.local/bin
 EOF
@@ -126,18 +126,19 @@ if [[ "$FROM_REMOTE" -eq 0 && -n "$script_dir" && -f "$script_dir/../codex-auth-
 else
   tmp_dir="$(mktemp -d)"
   archive="$tmp_dir/source.tar.gz"
-  log "Downloading $REPO_TARBALL_URL"
+  source_revision="$(latest_revision)"
+  download_url="${REPO_TARBALL_URL:-https://codeload.github.com/${REPO_SLUG}/tar.gz/${source_revision:-refs/heads/${BRANCH}}}"
+  log "Downloading $download_url"
   if [[ "$DRY_RUN" -eq 1 ]]; then
     log "[dry-run] would download and extract release archive"
     source_dir="$tmp_dir/source"
     mkdir -p "$source_dir"
   else
-    curl -fsSL "$REPO_TARBALL_URL" -o "$archive"
+    curl -fsSL "$download_url" -o "$archive"
     mkdir -p "$tmp_dir/source"
     tar -xzf "$archive" -C "$tmp_dir/source" --strip-components 1
     source_dir="$tmp_dir/source"
   fi
-  source_revision="$(latest_revision)"
 fi
 
 files=(
