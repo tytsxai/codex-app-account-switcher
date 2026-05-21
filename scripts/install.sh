@@ -120,6 +120,9 @@ if [[ "$FROM_REMOTE" -eq 0 && -n "$script_dir" && -f "$script_dir/../codex-auth-
   if command -v git >/dev/null 2>&1 && git -C "$source_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     source_revision="$(git -C "$source_dir" rev-parse HEAD 2>/dev/null || true)"
   fi
+  if [[ -z "$source_revision" ]]; then
+    source_revision="$(latest_revision)"
+  fi
 else
   tmp_dir="$(mktemp -d)"
   archive="$tmp_dir/source.tar.gz"

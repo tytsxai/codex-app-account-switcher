@@ -15,7 +15,10 @@ macOS 本机 Codex.app 账号池切换方案。它面向已经使用 `codex-auth
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/tytsxai/codex-app-account-switcher/main/scripts/install.sh | bash
+tmp="$(mktemp -d)" \
+  && curl -fsSL https://codeload.github.com/tytsxai/codex-app-account-switcher/tar.gz/refs/heads/main \
+  | tar -xz -C "$tmp" --strip-components 1 \
+  && bash "$tmp/scripts/install.sh"
 ```
 
 安装器会部署到：
@@ -114,7 +117,7 @@ codex-account-switch --check-updates
 codex-account-switch --self-update
 ```
 
-The update checker also reports the local `codex-auth` version, npm's latest published `codex-auth` version, raw installer availability, and the local Codex.app version when available.
+The update checker also reports the local `codex-auth` version, npm's latest published `codex-auth` version, raw installer and codeload availability, and the local Codex.app version when available.
 
 ## Development
 

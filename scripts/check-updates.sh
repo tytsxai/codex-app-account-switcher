@@ -15,7 +15,7 @@ Usage:
 
 Checks:
   - This project's latest GitHub main revision
-  - Raw installer availability
+  - Raw installer and codeload archive availability
   - Local codex-auth version vs npm latest
   - Local Codex.app version when installed
 EOF
@@ -61,6 +61,7 @@ semver_gt() {
 latest_revision=""
 project_status="unknown"
 installer_status="unknown"
+codeload_status="unknown"
 codex_auth_local=""
 codex_auth_latest=""
 codex_auth_status="unknown"
@@ -85,6 +86,11 @@ if have curl; then
     installer_status="ok"
   else
     installer_status="unreachable"
+  fi
+  if curl -fsIL "https://codeload.github.com/${REPO_SLUG}/tar.gz/refs/heads/${BRANCH}" >/dev/null 2>&1; then
+    codeload_status="ok"
+  else
+    codeload_status="unreachable"
   fi
 fi
 
@@ -116,7 +122,7 @@ if [[ -d /Applications/Codex.app ]] && have defaults; then
 fi
 
 outdated=0
-if [[ "$project_status" == "update_available" || "$codex_auth_status" == "update_available" || "$installer_status" == "unreachable" ]]; then
+if [[ "$project_status" == "update_available" || "$codex_auth_status" == "update_available" || "$installer_status" == "unreachable" || "$codeload_status" == "unreachable" ]]; then
   outdated=1
 fi
 
@@ -129,6 +135,7 @@ if [[ "$JSON_OUTPUT" -eq 1 ]]; then
     --arg latest_revision "$latest_revision" \
     --arg project_status "$project_status" \
     --arg installer_status "$installer_status" \
+    --arg codeload_status "$codeload_status" \
     --arg codex_auth_local "$codex_auth_local" \
     --arg codex_auth_latest "$codex_auth_latest" \
     --arg codex_auth_status "$codex_auth_status" \
@@ -142,6 +149,7 @@ if [[ "$JSON_OUTPUT" -eq 1 ]]; then
       latest_revision: $latest_revision,
       project_status: $project_status,
       installer_status: $installer_status,
+      codeload_status: $codeload_status,
       codex_auth: {
         local: $codex_auth_local,
         npm_latest: $codex_auth_latest,
@@ -157,6 +165,7 @@ else
   printf '  installed: %s\n' "${CURRENT_REVISION:-unknown}"
   printf '  latest:    %s\n' "${latest_revision:-unknown}"
   printf 'Installer raw URL: %s\n' "$installer_status"
+  printf 'Codeload archive: %s\n' "$codeload_status"
   printf 'codex-auth: local=%s npm_latest=%s status=%s\n' "${codex_auth_local:-unknown}" "${codex_auth_latest:-unknown}" "$codex_auth_status"
   printf 'Codex.app: %s\n' "${codex_app_version:-unknown}"
   if [[ "$project_status" == "update_available" ]]; then

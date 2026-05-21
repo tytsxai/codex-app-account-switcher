@@ -56,7 +56,7 @@ scripts/check-updates.sh --json
 scripts/check-updates.sh --fail-if-outdated
 ```
 
-The checker covers this repository, the raw installer URL, local `codex-auth`, npm's latest `codex-auth`, and the installed Codex.app version.
+The checker covers this repository, the raw installer URL, the codeload archive, local `codex-auth`, npm's latest `codex-auth`, and the installed Codex.app version.
 
 ## Troubleshooting
 
