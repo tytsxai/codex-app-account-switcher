@@ -19,6 +19,7 @@ Environment:
   REPO_SLUG=tytsxai/codex-app-account-switcher
   BRANCH=main
   REPO_TARBALL_URL=<optional explicit tarball URL>
+  SOURCE_REVISION=<optional commit SHA for pre-downloaded source trees>
   INSTALL_DIR=~/.local/share/codex-app-account-switcher
   BIN_DIR=~/.local/bin
 EOF
@@ -113,11 +114,11 @@ trap cleanup EXIT
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd 2>/dev/null || printf '')"
 source_dir=""
-source_revision=""
+source_revision="${SOURCE_REVISION:-}"
 
 if [[ "$FROM_REMOTE" -eq 0 && -n "$script_dir" && -f "$script_dir/../codex-auth-smart-switch.sh" ]]; then
   source_dir="$(cd "$script_dir/.." && pwd)"
-  if command -v git >/dev/null 2>&1 && git -C "$source_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if [[ -z "$source_revision" ]] && command -v git >/dev/null 2>&1 && git -C "$source_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     source_revision="$(git -C "$source_dir" rev-parse HEAD 2>/dev/null || true)"
   fi
   if [[ -z "$source_revision" ]]; then

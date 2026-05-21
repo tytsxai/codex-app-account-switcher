@@ -16,11 +16,11 @@ macOS 本机 Codex.app 账号池切换方案。它面向已经使用 `codex-auth
 
 ```bash
 repo="tytsxai/codex-app-account-switcher" \
-  && sha="$(curl -fsSL "https://api.github.com/repos/$repo/commits/main" | sed -n 's/.*"sha": *"\([0-9a-f]\{40\}\)".*/\1/p' | head -n 1)" \
+  && sha="$(curl -fsSL "https://api.github.com/repos/$repo/commits/main" | awk -F'"' '/^[[:space:]]*"sha":/ {print $4; exit}')" \
   && tmp="$(mktemp -d)" \
   && curl -fsSL "https://codeload.github.com/$repo/tar.gz/$sha" \
   | tar -xz -C "$tmp" --strip-components 1 \
-  && bash "$tmp/scripts/install.sh"
+  && SOURCE_REVISION="$sha" bash "$tmp/scripts/install.sh"
 ```
 
 安装器会部署到：
