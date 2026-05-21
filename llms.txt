@@ -1,0 +1,49 @@
+# Codex.app Account Switcher
+
+Codex.app Account Switcher is an unofficial local macOS CLI and launcher for switching the active Codex.app account snapshot. It is designed for users who already maintain multiple user-owned Codex / ChatGPT auth snapshots locally.
+
+## What it does
+
+- Reads local account pool metadata from `~/.codex/accounts/registry.json`.
+- Reads local auth snapshots from `~/.codex/accounts/*.auth.json`.
+- Refreshes tokens and reads live ChatGPT/Codex usage when possible.
+- Selects an account whose live usage is readable and whose remaining quota passes configured thresholds.
+- Writes the selected snapshot to `~/.codex/auth.json`.
+- Optionally restarts `/Applications/Codex.app` so the desktop app loads the new auth state.
+- Imports candidate auth JSON from `codex-auth`, `codex-sub2api`, or flat token JSON only after live validation.
+- Provides update checking and self-update for the installed local scripts.
+
+## What it is not
+
+- Not an OpenAI product.
+- Not a hosted account service.
+- Not a quota bypass tool.
+- Not a credential provider.
+- Not a server, Docker app, database app, or cloud deployment.
+
+## Primary audience
+
+Developers and advanced Codex.app users on macOS who understand local auth files and want a safer repeatable workflow for switching between their own local Codex / ChatGPT account snapshots.
+
+## Technology
+
+Bash, Node.js ESM, jq, curl, macOS open/osascript, local filesystem operations under `~/.codex`.
+
+## Important files
+
+- `README.md`: main bilingual project overview, installation, quick start, limitations.
+- `codex-app-hot-switch.sh`: high-level switch and optional relaunch flow.
+- `codex-auth-smart-switch.sh`: live usage refresh, account selection, cleanup logic.
+- `codex-auth-import-json.mjs`: source JSON import and live validation.
+- `codex-auth-load-free.mjs`: local Free-account source scan helper.
+- `codex-app-relaunch.sh`: macOS Codex.app restart helper.
+- `scripts/install.sh`: installer and CLI wrapper creator.
+- `scripts/check-updates.sh`: project and dependency update checker.
+- `docs/security.md`: credential boundaries and public repository safety.
+- `docs/operations.md`: daily operations and troubleshooting.
+- `docs/usage-examples.md`: practical command examples.
+- `docs/faq.md`: common limitations and behavior questions.
+
+## Keywords
+
+Codex.app account switcher, Codex account pool, ChatGPT auth snapshot, macOS Codex CLI helper, local auth management, codex-auth workflow, Bash Node.js jq developer tool, Codex desktop relaunch, AI coding account switch workflow.
