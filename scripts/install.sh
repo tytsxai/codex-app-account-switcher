@@ -151,6 +151,7 @@ files=(
   "codex-auth-smart-switch.sh"
   "启动Codex换号.command"
   "README.md"
+  "llms.txt"
   "LICENSE"
 )
 
