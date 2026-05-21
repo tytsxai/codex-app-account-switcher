@@ -93,6 +93,21 @@ for tool in jq node; do
   fi
 done
 
+log_step "更新链路检查"
+if [[ -x ./scripts/check-updates.sh ]]; then
+  ran=$((ran + 1))
+  if ./scripts/check-updates.sh --json >/tmp/check.err 2>&1 && jq -e '.repo and .installer_status' /tmp/check.err >/dev/null 2>&1; then
+    log_ok "scripts/check-updates.sh --json"
+  else
+    log_err "scripts/check-updates.sh --json"
+    sed 's/^/    /' /tmp/check.err
+    fail=$((fail + 1))
+  fi
+else
+  log_err "scripts/check-updates.sh 不存在或不可执行"
+  fail=$((fail + 1))
+fi
+
 log_step "公开仓库脱敏检查"
 private_user="xiaomo"
 invalid_suffix="invalid-sources"

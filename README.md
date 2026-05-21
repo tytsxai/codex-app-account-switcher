@@ -56,6 +56,14 @@ codex-account-switch --dry-run
 codex-account-switch --switch-only
 ```
 
+检查更新并自更新：
+
+```bash
+codex-account-switch --check-updates
+codex-account-switch --self-update
+codex-account-switch --version
+```
+
 维护账号池：
 
 ```bash
@@ -97,11 +105,23 @@ rm -f "$HOME/Desktop/启动Codex换号.command"
 
 This does not delete `~/.codex/accounts` or `~/.codex/auth.json`.
 
+## Keeping It Updated
+
+This project is intentionally small and can be safely reinstalled in place. The updater replaces the installed scripts and docs, but does not touch your `~/.codex` account pool.
+
+```bash
+codex-account-switch --check-updates
+codex-account-switch --self-update
+```
+
+The update checker also reports the local `codex-auth` version, npm's latest published `codex-auth` version, raw installer availability, and the local Codex.app version when available.
+
 ## Development
 
 ```bash
 ./check.sh
 scripts/install.sh --dry-run
+scripts/check-updates.sh
 ```
 
 The self-check validates shell syntax, Node syntax, optional shellcheck, required local tools, and common secret-leak patterns.
