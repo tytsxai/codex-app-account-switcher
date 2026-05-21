@@ -1,0 +1,28 @@
+.DS_Store
+*.log
+*.tmp
+*.swp
+
+.claude/
+.vscode/
+.idea/
+
+node_modules/
+.cache/
+
+# Never commit account pools, auth snapshots, source exports, or rejected inputs.
+codex-auth账号文件/
+account-sources/
+accounts/
+auth.json
+*.auth.json
+*token*.json
+*tokens*.json
+invalid-sources/
+accounts-invalid-sources/
+accounts-invalid-archive/
+
+# Installer/test scratch space.
+.install-test/
+tmp/
+dist/

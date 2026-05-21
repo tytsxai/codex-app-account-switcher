@@ -1,0 +1,10 @@
+{
+  "auth_mode": "chatgpt",
+  "last_refresh": "2026-01-01T00:00:00.000Z",
+  "tokens": {
+    "access_token": "<replace-with-your-local-access-token>",
+    "refresh_token": "<replace-with-your-local-refresh-token>",
+    "id_token": "<replace-with-your-local-id-token>",
+    "account_id": "<replace-with-your-chatgpt-account-id>"
+  }
+}
