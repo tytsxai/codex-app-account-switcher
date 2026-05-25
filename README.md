@@ -1,5 +1,7 @@
 # Codex.app Account Switcher / Codex 桌面端账号切换器
 
+[![CI](https://github.com/tytsxai/codex-app-account-switcher/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/tytsxai/codex-app-account-switcher/actions/workflows/ci.yml)
+
 Codex.app Account Switcher 是一个面向 macOS 的本地账号池切换工具。它帮助已经使用 `codex-auth` 或本地 ChatGPT/Codex 登录快照的用户，按实时可用额度选择账号，写入 `~/.codex/auth.json`，并可自动重启 Codex.app 让桌面端读取新的登录状态。
 
 > Unofficial local helper for Codex.app account pool switching. This project is not an OpenAI product and only works with user-owned local auth snapshots.
