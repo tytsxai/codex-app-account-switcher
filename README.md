@@ -187,11 +187,13 @@ CODEX_HOME="$HOME/.codex-test" codex-account-switch --dry-run
 
 ```bash
 ./check.sh
+NETWORK_CHECKS=1 ./check.sh
 scripts/install.sh --dry-run
+scripts/check-updates.sh --self-test
 scripts/check-updates.sh --json
 ```
 
-`./check.sh` 会验证 shell 语法、Node.js 语法、可选 shellcheck、依赖工具、更新链路和常见密钥泄露模式。
+`./check.sh` 默认只执行可离线复现的门禁：shell 语法、Node.js 语法、账号选择 fixture、可选 shellcheck、依赖工具和常见密钥泄露模式。联网更新链路容易受 GitHub/npm 临时网络影响，发版前需要额外设置 `NETWORK_CHECKS=1` 才会纳入硬门禁。
 
 ## 卸载 / Uninstall
 

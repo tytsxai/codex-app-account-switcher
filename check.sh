@@ -1,6 +1,6 @@
 #!/bin/bash
 # 项目自检：发版前手动跑一次，等价于一条最小化 CI。
-# 覆盖：bash 语法 / node 语法 / shellcheck（缺失则跳过）。
+# 覆盖：bash 语法 / node 语法 / 离线行为测试 / shellcheck（缺失则跳过）。
 # 失败立即非零退出，方便接入 git hook 或手动 gating。
 
 export LANG="${LANG:-en_US.UTF-8}"
@@ -17,6 +17,10 @@ C_RESET=$'\033[0m'
 
 fail=0
 ran=0
+NETWORK_CHECKS="${NETWORK_CHECKS:-0}"
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
+check_err="$tmp_dir/check.err"
 
 log_ok()   { printf '%s[ OK ]%s %s\n'   "$C_OK"   "$C_RESET" "$1"; }
 log_warn() { printf '%s[WARN]%s %s\n'   "$C_WARN" "$C_RESET" "$1"; }
@@ -36,11 +40,11 @@ done < <(find . -maxdepth 2 -type f -name '*.mjs' -not -path './.git/*' | sort)
 log_step "bash -n（shell 语法）"
 for f in "${shell_files[@]}"; do
   ran=$((ran + 1))
-  if bash -n "$f" 2>/tmp/check.err; then
+  if bash -n "$f" 2>"$check_err"; then
     log_ok "$f"
   else
     log_err "$f"
-    sed 's/^/    /' /tmp/check.err
+    sed 's/^/    /' "$check_err"
     fail=$((fail + 1))
   fi
 done
@@ -52,15 +56,30 @@ if ! command -v node >/dev/null 2>&1; then
 else
   for f in "${mjs_files[@]}"; do
     ran=$((ran + 1))
-    if node --check "$f" 2>/tmp/check.err; then
+    if node --check "$f" 2>"$check_err"; then
       log_ok "$f"
     else
       log_err "$f"
-      sed 's/^/    /' /tmp/check.err
+      sed 's/^/    /' "$check_err"
       fail=$((fail + 1))
     fi
   done
   [ ${#mjs_files[@]} -eq 0 ] && log_warn "未发现 .mjs 文件"
+fi
+
+log_step "离线行为测试"
+if [[ -x ./tests/selection-fixtures.sh ]]; then
+  ran=$((ran + 1))
+  if ./tests/selection-fixtures.sh >"$check_err" 2>&1; then
+    log_ok "tests/selection-fixtures.sh"
+  else
+    log_err "tests/selection-fixtures.sh"
+    sed 's/^/    /' "$check_err"
+    fail=$((fail + 1))
+  fi
+else
+  log_err "tests/selection-fixtures.sh 不存在或不可执行"
+  fail=$((fail + 1))
 fi
 
 log_step "shellcheck（静态分析）"
@@ -73,11 +92,11 @@ else
       *.command) log_warn "$f [zsh, shellcheck skip]"; continue ;;
     esac
     ran=$((ran + 1))
-    if shellcheck -S warning "$f" >/tmp/check.err 2>&1; then
+    if shellcheck -S warning "$f" >"$check_err" 2>&1; then
       log_ok "$f"
     else
       log_err "$f"
-      sed 's/^/    /' /tmp/check.err
+      sed 's/^/    /' "$check_err"
       fail=$((fail + 1))
     fi
   done
@@ -96,16 +115,34 @@ done
 log_step "更新链路检查"
 if [[ -x ./scripts/check-updates.sh ]]; then
   ran=$((ran + 1))
-  if ./scripts/check-updates.sh --json >/tmp/check.err 2>&1 && jq -e '.repo and .installer_status' /tmp/check.err >/dev/null 2>&1; then
-    log_ok "scripts/check-updates.sh --json"
+  if ./scripts/check-updates.sh --self-test >"$check_err" 2>&1; then
+    log_ok "scripts/check-updates.sh --self-test"
   else
-    log_err "scripts/check-updates.sh --json"
-    sed 's/^/    /' /tmp/check.err
+    log_err "scripts/check-updates.sh --self-test"
+    sed 's/^/    /' "$check_err"
     fail=$((fail + 1))
   fi
 else
   log_err "scripts/check-updates.sh 不存在或不可执行"
   fail=$((fail + 1))
+fi
+
+if [[ "$NETWORK_CHECKS" -eq 1 ]]; then
+  if [[ -x ./scripts/check-updates.sh ]]; then
+    ran=$((ran + 1))
+    if ./scripts/check-updates.sh --json >"$check_err" 2>&1 && jq -e '.repo and .installer_status' "$check_err" >/dev/null 2>&1; then
+      log_ok "scripts/check-updates.sh --json"
+    else
+      log_err "scripts/check-updates.sh --json"
+      sed 's/^/    /' "$check_err"
+      fail=$((fail + 1))
+    fi
+  else
+    log_err "scripts/check-updates.sh 不存在或不可执行"
+    fail=$((fail + 1))
+  fi
+else
+  log_warn "跳过联网更新链路检查（设置 NETWORK_CHECKS=1 启用）"
 fi
 
 log_step "公开仓库脱敏检查"
@@ -124,9 +161,9 @@ secret_patterns=(
 )
 
 for pattern in "${secret_patterns[@]}"; do
-  if rg -n --hidden --glob '!.git/**' --glob '!check.sh' --glob '!codex-auth账号文件/**' --glob '!*.DS_Store' "$pattern" . >/tmp/check.err 2>/dev/null; then
+  if rg -n --hidden --glob '!.git/**' --glob '!check.sh' --glob '!codex-auth账号文件/**' --glob '!*.DS_Store' "$pattern" . >"$check_err" 2>/dev/null; then
     log_err "疑似私有信息匹配: $pattern"
-    sed 's/^/    /' /tmp/check.err
+    sed 's/^/    /' "$check_err"
     fail=$((fail + 1))
   else
     log_ok "no match: $pattern"

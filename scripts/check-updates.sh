@@ -7,17 +7,21 @@ INSTALL_DIR="${INSTALL_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 CURRENT_REVISION="${CURRENT_REVISION:-$(cat "$INSTALL_DIR/.install-revision" 2>/dev/null || true)}"
 JSON_OUTPUT=0
 FAIL_IF_OUTDATED=0
+SELF_TEST=0
 
 usage() {
   cat <<'EOF'
 Usage:
-  check-updates.sh [--json] [--fail-if-outdated]
+  check-updates.sh [--json] [--fail-if-outdated] [--self-test]
 
 Checks:
   - This project's latest GitHub main revision
   - Raw installer and codeload archive availability
   - Local codex-auth version vs npm latest
   - Local Codex.app version when installed
+
+Self-test:
+  --self-test runs offline version-comparison assertions.
 EOF
 }
 
@@ -28,6 +32,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --fail-if-outdated)
       FAIL_IF_OUTDATED=1
+      ;;
+    --self-test)
+      SELF_TEST=1
       ;;
     --help|-h)
       usage
@@ -55,8 +62,108 @@ semver_gt() {
   local right="$2"
   [[ -n "$left" && -n "$right" ]] || return 1
   [[ "$left" != "$right" ]] || return 1
-  [[ "$(printf '%s\n%s\n' "$right" "$left" | sort -V | tail -n 1)" == "$left" ]]
+  awk -v left="$left" -v right="$right" '
+    function parse_version(version, numbers, prerelease, main_parts, meta_parts, dash_index, count, i) {
+      sub(/^[vV]/, "", version)
+      split(version, meta_parts, /\+/)
+      version = meta_parts[1]
+      dash_index = index(version, "-")
+      if (dash_index > 0) {
+        prerelease[1] = substr(version, dash_index + 1)
+        version = substr(version, 1, dash_index - 1)
+      } else {
+        prerelease[1] = ""
+      }
+
+      count = split(version, main_parts, ".")
+      for (i = 1; i <= 3; i += 1) {
+        if (i <= count && main_parts[i] ~ /^[0-9]+$/) {
+          numbers[i] = main_parts[i] + 0
+        } else {
+          numbers[i] = 0
+        }
+      }
+    }
+
+    function compare_prerelease(left_pre, right_pre, left_parts, right_parts, left_count, right_count, i, left_numeric, right_numeric) {
+      if (left_pre == "" && right_pre != "") return 1
+      if (left_pre != "" && right_pre == "") return -1
+      if (left_pre == right_pre) return 0
+
+      left_count = split(left_pre, left_parts, ".")
+      right_count = split(right_pre, right_parts, ".")
+      for (i = 1; i <= left_count || i <= right_count; i += 1) {
+        if (i > left_count) return -1
+        if (i > right_count) return 1
+
+        left_numeric = left_parts[i] ~ /^[0-9]+$/
+        right_numeric = right_parts[i] ~ /^[0-9]+$/
+        if (left_numeric && right_numeric) {
+          if (left_parts[i] + 0 > right_parts[i] + 0) return 1
+          if (left_parts[i] + 0 < right_parts[i] + 0) return -1
+        } else if (left_numeric && !right_numeric) {
+          return -1
+        } else if (!left_numeric && right_numeric) {
+          return 1
+        } else {
+          if (left_parts[i] > right_parts[i]) return 1
+          if (left_parts[i] < right_parts[i]) return -1
+        }
+      }
+      return 0
+    }
+
+    BEGIN {
+      parse_version(left, left_numbers, left_prerelease)
+      parse_version(right, right_numbers, right_prerelease)
+      for (i = 1; i <= 3; i += 1) {
+        if (left_numbers[i] > right_numbers[i]) exit 0
+        if (left_numbers[i] < right_numbers[i]) exit 1
+      }
+      exit(compare_prerelease(left_prerelease[1], right_prerelease[1]) > 0 ? 0 : 1)
+    }
+  '
 }
+
+run_self_test() {
+  local fail=0
+
+  expect_gt() {
+    local left="$1"
+    local right="$2"
+    if semver_gt "$left" "$right"; then
+      printf 'OK: %s > %s\n' "$left" "$right"
+    else
+      printf 'FAIL: expected %s > %s\n' "$left" "$right" >&2
+      fail=$((fail + 1))
+    fi
+  }
+
+  expect_not_gt() {
+    local left="$1"
+    local right="$2"
+    if semver_gt "$left" "$right"; then
+      printf 'FAIL: expected %s <= %s\n' "$left" "$right" >&2
+      fail=$((fail + 1))
+    else
+      printf 'OK: %s <= %s\n' "$left" "$right"
+    fi
+  }
+
+  expect_gt "1.10.0" "1.9.9"
+  expect_gt "2.0.0" "2.0.0-beta.1"
+  expect_gt "v1.2.4" "1.2.3"
+  expect_not_gt "1.2.3" "1.2.3"
+  expect_not_gt "1.2.3" "1.10.0"
+  expect_not_gt "2.0.0-beta.1" "2.0.0"
+
+  [[ "$fail" -eq 0 ]]
+}
+
+if [[ "$SELF_TEST" -eq 1 ]]; then
+  run_self_test
+  exit $?
+fi
 
 latest_revision=""
 project_status="unknown"

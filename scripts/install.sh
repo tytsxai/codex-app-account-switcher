@@ -166,13 +166,15 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
   else
     printf '0.0.0-unknown\n' >"$INSTALL_DIR/VERSION"
   fi
-  rm -rf "$INSTALL_DIR/docs" "$INSTALL_DIR/examples"
+  rm -rf "$INSTALL_DIR/docs" "$INSTALL_DIR/examples" "$INSTALL_DIR/tests"
   rm -rf "$INSTALL_DIR/scripts"
   [[ -d "$source_dir/docs" ]] && cp -R "$source_dir/docs" "$INSTALL_DIR/docs"
   [[ -d "$source_dir/examples" ]] && cp -R "$source_dir/examples" "$INSTALL_DIR/examples"
+  [[ -d "$source_dir/tests" ]] && cp -R "$source_dir/tests" "$INSTALL_DIR/tests"
   [[ -d "$source_dir/scripts" ]] && cp -R "$source_dir/scripts" "$INSTALL_DIR/scripts"
   chmod +x "$INSTALL_DIR"/*.sh "$INSTALL_DIR"/*.mjs "$INSTALL_DIR/启动Codex换号.command"
   [[ ! -d "$INSTALL_DIR/scripts" ]] || chmod +x "$INSTALL_DIR"/scripts/*.sh
+  [[ ! -d "$INSTALL_DIR/tests" ]] || chmod +x "$INSTALL_DIR"/tests/*.sh
   printf '%s\n' "${source_revision:-unknown}" >"$INSTALL_DIR/.install-revision"
   printf '%s\n' "$REPO_SLUG" >"$INSTALL_DIR/.install-source"
 else

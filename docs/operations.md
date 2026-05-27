@@ -68,9 +68,19 @@ For automation:
 ```bash
 scripts/check-updates.sh --json
 scripts/check-updates.sh --fail-if-outdated
+scripts/check-updates.sh --self-test
 ```
 
-The checker covers this repository, the raw installer URL, the codeload archive, local `codex-auth`, npm's latest `codex-auth`, and the installed Codex.app version.
+The checker covers this repository, the raw installer URL, the codeload archive, local `codex-auth`, npm's latest `codex-auth`, and the installed Codex.app version. `--self-test` is offline and validates the portable version comparison used on macOS, without depending on GNU `sort -V`.
+
+## Local Release Gate
+
+```bash
+./check.sh
+NETWORK_CHECKS=1 ./check.sh
+```
+
+The default check is safe for offline CI and local maintenance: it validates shell syntax, Node.js syntax, account-selection fixtures, optional shellcheck, required local tools, and common secret-leak patterns. Set `NETWORK_CHECKS=1` before publishing a release or validating an installed copy against live GitHub/npm update paths.
 
 ## Installed Paths
 
@@ -81,6 +91,7 @@ Default installation paths:
 - Desktop launcher: `~/Desktop/启动Codex换号.command`
 
 The installer copies scripts, docs, examples, `README.md`, `llms.txt`, `LICENSE`, and `VERSION`. It does not copy or create real auth snapshots.
+It also copies `tests/` so the installed `check.sh` can run its offline fixture gate.
 
 ## Useful Environment Variables
 
