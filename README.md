@@ -125,6 +125,7 @@ codex-account-switch --exclude-plan plus --dry-run
 # 检查更新、自更新、查看版本
 codex-account-switch --check-updates
 codex-account-switch --self-update
+codex-account-switch --update-upstreams
 codex-account-switch --version
 ```
 
@@ -221,9 +222,16 @@ rm -f "$HOME/Desktop/启动Codex换号.command"
 ```bash
 codex-account-switch --check-updates
 codex-account-switch --self-update
+codex-account-switch --update-upstreams
 ```
 
-自更新会替换安装目录中的脚本和文档，不会主动删除你的 `~/.codex` 账号池。更新检查会同时报告本仓库 revision、raw installer、codeload archive、本地 `codex-auth`、npm 最新 `codex-auth` 和本地 Codex.app 版本。
+自更新会替换安装目录中的脚本和文档，并优先跟踪安装时记录的 `.install-source` / `.install-branch`，不会因为默认配置把 fork 或对应开源项目切回错误仓库；它也不会主动删除你的 `~/.codex` 账号池。`--update-upstreams` 用于更新频繁变化的上游工具，目前会在检查到 `codex-auth` 落后时通过 npm 更新检测到的上游包，默认是 `@loongphy/codex-auth@latest`。
+
+更新检查会同时报告本仓库 revision、raw installer、codeload archive、本地 `codex-auth`、检测到的 npm 上游包、`Loongphy/codex-auth` GitHub 最新 release 和本地 Codex.app 版本。需要一次维护完成时可运行：
+
+```bash
+codex-account-switch --self-update --update-upstreams
+```
 
 ## 推荐 GitHub Topics
 

@@ -33,7 +33,7 @@ Default installed paths:
 - App files: `~/.local/share/codex-app-account-switcher`
 - CLI wrapper: `~/.local/bin/codex-account-switch`
 - Finder launcher: `~/Desktop/启动Codex换号.command`
-- Install metadata: `.install-revision` and `.install-source` in the app files directory.
+- Install metadata: `.install-revision`, `.install-source`, and `.install-branch` in the app files directory.
 
 Add this to the shell profile when needed:
 
@@ -56,9 +56,12 @@ Use local install during development when validating installer behavior without 
 ```bash
 codex-account-switch --check-updates
 codex-account-switch --self-update
+codex-account-switch --update-upstreams
 ```
 
-Self-update replaces installed scripts, docs, examples, tests, and metadata under the install directory. It does not delete or rewrite `~/.codex/accounts` or `~/.codex/auth.json`.
+Self-update replaces installed scripts, docs, examples, tests, and metadata under the install directory. It reads `.install-source` and `.install-branch` first, so an install from a fork or upstream open-source repo keeps tracking that same source unless `REPO_SLUG` or `BRANCH` is explicitly overridden. It does not delete or rewrite `~/.codex/accounts` or `~/.codex/auth.json`.
+
+Upstream updates are explicit. `codex-account-switch --update-upstreams` updates frequently changing upstream tooling such as `@loongphy/codex-auth` through npm after checking the detected local package, npm `latest`, and the GitHub latest release. Use `codex-account-switch --self-update --update-upstreams` when you want to update this repository and the upstream CLI in one maintenance command.
 
 ### Rollback
 

@@ -18,7 +18,8 @@ This document maps each important file to its responsibility, dependencies, writ
 | File | Responsibility |
 | --- | --- |
 | `scripts/install.sh` | Installs scripts, docs, examples, tests, CLI wrapper, launcher, and install metadata. |
-| `scripts/check-updates.sh` | Checks repo revision, installer URLs, codeload archive, `codex-auth`, and Codex.app version. |
+| `scripts/check-updates.sh` | Checks repo revision, installer URLs, codeload archive, upstream `codex-auth` npm/GitHub versions, and Codex.app version. |
+| `scripts/update-upstreams.sh` | Updates explicitly approved upstream tooling such as `@loongphy/codex-auth` through npm. |
 | `check.sh` | Local release gate: syntax checks, fixture tests, optional shellcheck, dependency checks, update self-test, secret patterns. |
 | `tests/selection-fixtures.sh` | Offline jq fixture for account availability, Free-first selection, exclusion, and stale-source diagnostics. |
 

@@ -24,7 +24,7 @@ Codex.app Account Switcher 是一个 macOS 本地 Codex.app 账号池切换工�
 - Main use: switch Codex.app local auth snapshot after live usage validation.
 - Runtime data: `~/.codex/auth.json`, `~/.codex/accounts/registry.json`, `~/.codex/accounts/*.auth.json`.
 - Languages: Bash and Node.js ESM.
-- Required tools: `jq`, `node`, `curl`, `tar`; `codex-auth` is optional but useful for preparing auth snapshots.
+- Required tools: `jq`, `node`, `curl`, `tar`; `codex-auth` is optional but useful for preparing auth snapshots and can be checked/updated through the upstream update flow.
 - Deployment: supported runtime is local macOS; container/server usage is validation-only and must not host account pools.
 - Local release gate: `./check.sh` is offline by default; use `NETWORK_CHECKS=1 ./check.sh` for release checks that include GitHub/npm update paths.
 

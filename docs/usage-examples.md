@@ -80,7 +80,10 @@ Run dry run first. Cleanup removes only deterministic unusable states and keeps 
 ```bash
 codex-account-switch --check-updates
 codex-account-switch --self-update
+codex-account-switch --update-upstreams
 codex-account-switch --version
 ```
 
 Self-update replaces installed scripts and docs under `~/.local/share/codex-app-account-switcher`. It does not delete `~/.codex/accounts` or `~/.codex/auth.json`.
+
+Use `--update-upstreams` when `codex-auth` itself is behind upstream. Use `codex-account-switch --self-update --update-upstreams` to update this wrapper first and then update upstream tooling.

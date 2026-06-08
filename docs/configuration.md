@@ -105,11 +105,18 @@ FREE_IMPORT_SEARCH_DIRS="$HOME/.codex/account-sources:$HOME/Documents/codex-acco
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `REPO_SLUG` | `tytsxai/codex-app-account-switcher` | GitHub repo for install/update. |
-| `BRANCH` | `main` | Branch used by remote install/update checks. |
+| `REPO_SLUG` | `.install-source`, fallback `tytsxai/codex-app-account-switcher` | GitHub repo for install/update. |
+| `BRANCH` | `.install-branch`, fallback `main` | Branch used by remote install/update checks. |
 | `REPO_TARBALL_URL` | empty | Explicit source archive URL for installer. |
 | `SOURCE_REVISION` | empty | Commit SHA recorded by installer for pre-downloaded source trees. |
 | `CURRENT_REVISION` | `.install-revision` | Override current revision for update checks. |
+| `CODEX_AUTH_PACKAGE` | detected, fallback `@loongphy/codex-auth` | npm package used for upstream `codex-auth` checks and updates. |
+| `CODEX_AUTH_NPM_TAG` | `latest` | npm dist-tag used for upstream `codex-auth` updates. |
+| `CODEX_AUTH_REPO_SLUG` | `Loongphy/codex-auth` | GitHub repo used for upstream `codex-auth` latest release checks. |
+| `UPDATE_CONNECT_TIMEOUT` | `5` | Curl connect timeout in seconds for install/update GitHub checks. |
+| `UPDATE_MAX_TIME` | `20` checker, `60` installer | Curl total timeout in seconds for install/update GitHub checks. |
+| `NPM_VIEW_TIMEOUT` | `20` | Wall-clock timeout in seconds for npm version checks. |
+| `NPM_FETCH_TIMEOUT_MS` | `60000` | npm fetch timeout for upstream package checks and updates. |
 | `NETWORK_CHECKS` | `0` | Enables live GitHub/npm update checks in `check.sh`. |
 
 ## Operational Defaults

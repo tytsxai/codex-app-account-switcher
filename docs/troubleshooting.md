@@ -149,6 +149,14 @@ scripts/check-updates.sh --self-test
 
 If GitHub or npm is temporarily unreachable, local switching can still work. Treat update check failure as release-blocking only when `NETWORK_CHECKS=1 ./check.sh` is part of a release gate.
 
+When `codex-auth` is reported as `update_available`, run:
+
+```bash
+codex-account-switch --update-upstreams
+```
+
+If the checker shows `local_newer_than_upstream`, the installed command is newer than the newest stable upstream signal. Check `CODEX_AUTH_NPM_TAG` if you intentionally track a prerelease tag such as `next`.
+
 ## Secret Leak Response
 
 If real credentials were committed or shared:

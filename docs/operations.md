@@ -61,10 +61,17 @@ Cleanup archives are stored outside the active account pool so that a later acco
 ```bash
 codex-account-switch --check-updates
 codex-account-switch --self-update
+codex-account-switch --update-upstreams
 codex-account-switch --version
 ```
 
-`--self-update` re-runs the installer against the current GitHub `main` branch and overwrites the installed scripts under `~/.local/share/codex-app-account-switcher`. It does not delete or rewrite `~/.codex/accounts` unless you separately run account maintenance commands.
+`--self-update` re-runs the installer against the installed GitHub source and overwrites the scripts under `~/.local/share/codex-app-account-switcher`. The installed source is recorded in `.install-source` and `.install-branch`, which prevents a fork or tracked upstream open-source project from silently falling back to the default repository. It does not delete or rewrite `~/.codex/accounts` unless you separately run account maintenance commands.
+
+`--update-upstreams` updates frequently changing upstream tools, currently `codex-auth`, through npm when the checker reports an upstream update. It is separate from `--self-update` because it mutates the user's global npm package state. To run both in one maintenance pass:
+
+```bash
+codex-account-switch --self-update --update-upstreams
+```
 
 For automation:
 
@@ -74,7 +81,7 @@ scripts/check-updates.sh --fail-if-outdated
 scripts/check-updates.sh --self-test
 ```
 
-The checker covers this repository, the raw installer URL, the codeload archive, local `codex-auth`, npm's latest `codex-auth`, and the installed Codex.app version. `--self-test` is offline and validates the portable version comparison used on macOS, without depending on GNU `sort -V`.
+The checker covers this repository, the raw installer URL, the codeload archive, local `codex-auth`, the detected upstream npm package, GitHub latest release for `Loongphy/codex-auth`, and the installed Codex.app version. `--self-test` is offline and validates the portable version comparison used on macOS, without depending on GNU `sort -V`.
 
 ## Local Release Gate
 
