@@ -6,14 +6,17 @@ BRANCH="${BRANCH:-main}"
 REPO_TARBALL_URL="${REPO_TARBALL_URL:-}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/share/codex-app-account-switcher}"
 BIN_DIR="${BIN_DIR:-$HOME/.local/bin}"
+UPDATE_CONNECT_TIMEOUT="${UPDATE_CONNECT_TIMEOUT:-5}"
+UPDATE_MAX_TIME="${UPDATE_MAX_TIME:-60}"
 DESKTOP_SHORTCUT=1
 DRY_RUN=0
 FROM_REMOTE=0
+UPDATE_UPSTREAMS=0
 
 usage() {
   cat <<'EOF'
 Usage:
-  install.sh [--dry-run] [--install-dir <dir>] [--bin-dir <dir>] [--no-desktop-shortcut] [--from-remote]
+  install.sh [--dry-run] [--install-dir <dir>] [--bin-dir <dir>] [--no-desktop-shortcut] [--from-remote] [--update-upstreams]
 
 Environment:
   REPO_SLUG=tytsxai/codex-app-account-switcher
@@ -22,6 +25,8 @@ Environment:
   SOURCE_REVISION=<optional commit SHA for pre-downloaded source trees>
   INSTALL_DIR=~/.local/share/codex-app-account-switcher
   BIN_DIR=~/.local/bin
+  UPDATE_CONNECT_TIMEOUT=5
+  UPDATE_MAX_TIME=60
 EOF
 }
 
@@ -83,6 +88,9 @@ while [[ $# -gt 0 ]]; do
     --from-remote)
       FROM_REMOTE=1
       ;;
+    --update-upstreams|--update-deps)
+      UPDATE_UPSTREAMS=1
+      ;;
     --help|-h)
       usage
       exit 0
@@ -103,7 +111,7 @@ check_command codex-auth optional
 [[ -d /Applications/Codex.app ]] || warn "Codex.app not found at /Applications/Codex.app"
 
 latest_revision() {
-  curl -fsSL "https://api.github.com/repos/${REPO_SLUG}/commits/${BRANCH}" | jq -r '.sha // empty' 2>/dev/null || true
+  curl --connect-timeout "$UPDATE_CONNECT_TIMEOUT" --max-time "$UPDATE_MAX_TIME" -fsSL "https://api.github.com/repos/${REPO_SLUG}/commits/${BRANCH}" 2>/dev/null | jq -r '.sha // empty' 2>/dev/null || true
 }
 
 tmp_dir=""
@@ -135,7 +143,7 @@ else
     source_dir="$tmp_dir/source"
     mkdir -p "$source_dir"
   else
-    curl -fsSL "$download_url" -o "$archive"
+    curl --connect-timeout "$UPDATE_CONNECT_TIMEOUT" --max-time "$UPDATE_MAX_TIME" -fsSL "$download_url" -o "$archive"
     mkdir -p "$tmp_dir/source"
     tar -xzf "$archive" -C "$tmp_dir/source" --strip-components 1
     source_dir="$tmp_dir/source"
@@ -179,6 +187,7 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
   [[ ! -d "$INSTALL_DIR/tests" ]] || chmod +x "$INSTALL_DIR"/tests/*.sh
   printf '%s\n' "${source_revision:-unknown}" >"$INSTALL_DIR/.install-revision"
   printf '%s\n' "$REPO_SLUG" >"$INSTALL_DIR/.install-source"
+  printf '%s\n' "$BRANCH" >"$INSTALL_DIR/.install-branch"
 else
   log "[dry-run] would install files into $INSTALL_DIR"
   log "[dry-run] would create CLI wrapper in $BIN_DIR"
@@ -191,6 +200,14 @@ if [[ "$DRY_RUN" -eq 0 ]]; then
 set -euo pipefail
 APP_DIR="$INSTALL_DIR"
 BIN_DIR="$BIN_DIR"
+if [[ -f "\$APP_DIR/.install-source" && -z "\${REPO_SLUG:-}" ]]; then
+  REPO_SLUG="\$(cat "\$APP_DIR/.install-source")"
+  export REPO_SLUG
+fi
+if [[ -f "\$APP_DIR/.install-branch" && -z "\${BRANCH:-}" ]]; then
+  BRANCH="\$(cat "\$APP_DIR/.install-branch")"
+  export BRANCH
+fi
 if [[ "\$#" -eq 0 ]]; then
   exec "\$APP_DIR/启动Codex换号.command"
 fi
@@ -202,6 +219,10 @@ case "\${1:-}" in
   --check-updates|check-updates)
     shift
     exec "\$APP_DIR/scripts/check-updates.sh" "\$@"
+    ;;
+  --update-upstreams|update-upstreams|--update-deps|update-deps)
+    shift
+    exec "\$APP_DIR/scripts/update-upstreams.sh" "\$@"
     ;;
   --version|-V)
     printf 'codex-app-account-switcher %s\n' "\$(cat "\$APP_DIR/VERSION" 2>/dev/null || printf unknown)"
@@ -224,6 +245,16 @@ EOF
     chmod +x "$desktop_launcher"
   else
     log "[dry-run] would create $desktop_launcher"
+  fi
+fi
+
+if [[ "$UPDATE_UPSTREAMS" -eq 1 ]]; then
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "[dry-run] would run $INSTALL_DIR/scripts/update-upstreams.sh --dry-run"
+  elif [[ -x "$INSTALL_DIR/scripts/update-upstreams.sh" ]]; then
+    "$INSTALL_DIR/scripts/update-upstreams.sh"
+  else
+    warn "upstream updater not found: $INSTALL_DIR/scripts/update-upstreams.sh"
   fi
 fi
 

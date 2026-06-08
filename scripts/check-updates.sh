@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_SLUG="${REPO_SLUG:-tytsxai/codex-app-account-switcher}"
-BRANCH="${BRANCH:-main}"
 INSTALL_DIR="${INSTALL_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+REPO_SLUG="${REPO_SLUG:-$(cat "$INSTALL_DIR/.install-source" 2>/dev/null || printf 'tytsxai/codex-app-account-switcher')}"
+BRANCH="${BRANCH:-$(cat "$INSTALL_DIR/.install-branch" 2>/dev/null || printf 'main')}"
 CURRENT_REVISION="${CURRENT_REVISION:-$(cat "$INSTALL_DIR/.install-revision" 2>/dev/null || true)}"
+CODEX_AUTH_PACKAGE="${CODEX_AUTH_PACKAGE:-}"
+CODEX_AUTH_NPM_TAG="${CODEX_AUTH_NPM_TAG:-latest}"
+CODEX_AUTH_REPO_SLUG="${CODEX_AUTH_REPO_SLUG:-Loongphy/codex-auth}"
+UPDATE_CONNECT_TIMEOUT="${UPDATE_CONNECT_TIMEOUT:-5}"
+UPDATE_MAX_TIME="${UPDATE_MAX_TIME:-20}"
+NPM_VIEW_TIMEOUT="${NPM_VIEW_TIMEOUT:-20}"
+NPM_FETCH_TIMEOUT_MS="${NPM_FETCH_TIMEOUT_MS:-60000}"
 JSON_OUTPUT=0
 FAIL_IF_OUTDATED=0
 SELF_TEST=0
@@ -17,8 +24,18 @@ Usage:
 Checks:
   - This project's latest GitHub main revision
   - Raw installer and codeload archive availability
-  - Local codex-auth version vs npm latest
+  - Local codex-auth version vs its npm tag and GitHub latest release
   - Local Codex.app version when installed
+
+Environment:
+  CODEX_AUTH_PACKAGE defaults to the installed codex-auth package name,
+  falling back to @loongphy/codex-auth.
+  CODEX_AUTH_NPM_TAG defaults to latest.
+  CODEX_AUTH_REPO_SLUG defaults to Loongphy/codex-auth.
+  UPDATE_CONNECT_TIMEOUT defaults to 5 seconds.
+  UPDATE_MAX_TIME defaults to 20 seconds for curl calls.
+  NPM_VIEW_TIMEOUT defaults to 20 seconds.
+  NPM_FETCH_TIMEOUT_MS defaults to 60000 milliseconds.
 
 Self-test:
   --self-test runs offline version-comparison assertions.
@@ -55,6 +72,79 @@ have() {
 
 json_string() {
   jq -Rn --arg v "$1" '$v'
+}
+
+run_with_timeout() {
+  local timeout="$1"
+  shift
+  local tmp_out cmd_pid watcher_pid status
+
+  tmp_out="$(mktemp "${TMPDIR:-/tmp}/check-updates.XXXXXX")" || return 1
+  "$@" >"$tmp_out" 2>/dev/null &
+  cmd_pid=$!
+
+  (
+    sleep "$timeout"
+    kill "$cmd_pid" 2>/dev/null || true
+  ) &
+  watcher_pid=$!
+
+  if wait "$cmd_pid"; then
+    status=0
+  else
+    status=$?
+  fi
+
+  kill "$watcher_pid" 2>/dev/null || true
+  wait "$watcher_pid" 2>/dev/null || true
+  cat "$tmp_out"
+  rm -f "$tmp_out"
+  return "$status"
+}
+
+detect_codex_auth_package() {
+  if [[ -n "$CODEX_AUTH_PACKAGE" ]]; then
+    printf '%s\n' "$CODEX_AUTH_PACKAGE"
+    return
+  fi
+
+  if have codex-auth && have node; then
+    local codex_auth_path
+    codex_auth_path="$(command -v codex-auth 2>/dev/null || true)"
+    if [[ -n "$codex_auth_path" ]]; then
+      local detected_package
+      detected_package="$(node - "$codex_auth_path" <<'NODE' 2>/dev/null || true
+const fs = require('fs');
+const path = require('path');
+
+let current = process.argv[2];
+try {
+  current = fs.realpathSync(current);
+  if (fs.statSync(current).isFile()) current = path.dirname(current);
+  while (current && current !== path.dirname(current)) {
+    const packagePath = path.join(current, 'package.json');
+    if (fs.existsSync(packagePath)) {
+      const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+      if (pkg?.name && (pkg?.bin?.['codex-auth'] || pkg.name.includes('codex-auth'))) {
+        console.log(pkg.name);
+        process.exit(0);
+      }
+    }
+    current = path.dirname(current);
+  }
+} catch {
+  // Fall through to the shell fallback.
+}
+NODE
+)"
+      if [[ -n "$detected_package" ]]; then
+        printf '%s\n' "$detected_package"
+        return
+      fi
+    fi
+  fi
+
+  printf '@loongphy/codex-auth\n'
 }
 
 semver_gt() {
@@ -171,11 +261,15 @@ installer_status="unknown"
 codeload_status="unknown"
 codex_auth_local=""
 codex_auth_latest=""
+codex_auth_package="$(detect_codex_auth_package | tail -n 1)"
+codex_auth_npm_latest=""
+codex_auth_github_latest=""
+codex_auth_github_latest_tag=""
 codex_auth_status="unknown"
 codex_app_version=""
 
 if have curl && have jq; then
-  latest_revision="$(curl -fsSL "https://api.github.com/repos/${REPO_SLUG}/commits/${BRANCH}" | jq -r '.sha // empty' 2>/dev/null || true)"
+  latest_revision="$(curl --connect-timeout "$UPDATE_CONNECT_TIMEOUT" --max-time "$UPDATE_MAX_TIME" -fsSL "https://api.github.com/repos/${REPO_SLUG}/commits/${BRANCH}" 2>/dev/null | jq -r '.sha // empty' 2>/dev/null || true)"
 fi
 
 if [[ -n "$latest_revision" && -n "$CURRENT_REVISION" ]]; then
@@ -189,13 +283,13 @@ elif [[ -n "$latest_revision" ]]; then
 fi
 
 if have curl; then
-  if curl -fsIL "https://raw.githubusercontent.com/${REPO_SLUG}/${BRANCH}/scripts/install.sh" >/dev/null 2>&1; then
+  if curl --connect-timeout "$UPDATE_CONNECT_TIMEOUT" --max-time "$UPDATE_MAX_TIME" -fsIL "https://raw.githubusercontent.com/${REPO_SLUG}/${BRANCH}/scripts/install.sh" >/dev/null 2>&1; then
     installer_status="ok"
   else
     installer_status="unreachable"
   fi
   codeload_ref="${latest_revision:-refs/heads/${BRANCH}}"
-  if curl -fsIL "https://codeload.github.com/${REPO_SLUG}/tar.gz/${codeload_ref}" >/dev/null 2>&1; then
+  if curl --connect-timeout "$UPDATE_CONNECT_TIMEOUT" --max-time "$UPDATE_MAX_TIME" -fsIL "https://codeload.github.com/${REPO_SLUG}/tar.gz/${codeload_ref}" >/dev/null 2>&1; then
     codeload_status="ok"
   else
     codeload_status="unreachable"
@@ -205,23 +299,35 @@ fi
 if have codex-auth; then
   codex_auth_local="$(codex-auth --version 2>/dev/null | awk '{print $NF}' || true)"
 fi
-if have npm; then
-  codex_auth_latest="$(npm view codex-auth version 2>/dev/null || true)"
+if have npm && [[ -n "$codex_auth_package" ]]; then
+  codex_auth_npm_latest="$(run_with_timeout "$NPM_VIEW_TIMEOUT" npm --fetch-timeout "$NPM_FETCH_TIMEOUT_MS" view "${codex_auth_package}@${CODEX_AUTH_NPM_TAG}" version || true)"
+fi
+if have curl && have jq && [[ -n "$CODEX_AUTH_REPO_SLUG" ]]; then
+  codex_auth_github_latest_tag="$(curl --connect-timeout "$UPDATE_CONNECT_TIMEOUT" --max-time "$UPDATE_MAX_TIME" -fsSL "https://api.github.com/repos/${CODEX_AUTH_REPO_SLUG}/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null || true)"
+  codex_auth_github_latest="${codex_auth_github_latest_tag#v}"
+  codex_auth_github_latest="${codex_auth_github_latest#V}"
+fi
+
+codex_auth_latest="$codex_auth_npm_latest"
+if [[ -n "$codex_auth_github_latest" ]]; then
+  if [[ -z "$codex_auth_latest" ]] || semver_gt "$codex_auth_github_latest" "$codex_auth_latest"; then
+    codex_auth_latest="$codex_auth_github_latest"
+  fi
 fi
 
 if [[ -n "$codex_auth_local" && -n "$codex_auth_latest" ]]; then
-  if [[ "$codex_auth_local" == "$codex_auth_latest" ]]; then
+  if [[ "$codex_auth_local" == "$codex_auth_latest" || "v$codex_auth_local" == "$codex_auth_github_latest_tag" || "V$codex_auth_local" == "$codex_auth_github_latest_tag" ]]; then
     codex_auth_status="current"
   elif semver_gt "$codex_auth_latest" "$codex_auth_local"; then
     codex_auth_status="update_available"
   elif semver_gt "$codex_auth_local" "$codex_auth_latest"; then
-    codex_auth_status="local_newer_than_npm"
+    codex_auth_status="local_newer_than_upstream"
   else
     codex_auth_status="version_mismatch"
   fi
 elif [[ -n "$codex_auth_local" ]]; then
   codex_auth_status="local_only"
-elif [[ -n "$codex_auth_latest" ]]; then
+elif [[ -n "$codex_auth_latest" || -n "$codex_auth_npm_latest" || -n "$codex_auth_github_latest" ]]; then
   codex_auth_status="not_installed"
 fi
 
@@ -245,6 +351,12 @@ if [[ "$JSON_OUTPUT" -eq 1 ]]; then
     --arg installer_status "$installer_status" \
     --arg codeload_status "$codeload_status" \
     --arg codex_auth_local "$codex_auth_local" \
+    --arg codex_auth_package "$codex_auth_package" \
+    --arg codex_auth_npm_tag "$CODEX_AUTH_NPM_TAG" \
+    --arg codex_auth_npm_latest "$codex_auth_npm_latest" \
+    --arg codex_auth_github_repo "$CODEX_AUTH_REPO_SLUG" \
+    --arg codex_auth_github_latest "$codex_auth_github_latest" \
+    --arg codex_auth_github_latest_tag "$codex_auth_github_latest_tag" \
     --arg codex_auth_latest "$codex_auth_latest" \
     --arg codex_auth_status "$codex_auth_status" \
     --arg codex_app_version "$codex_app_version" \
@@ -259,8 +371,14 @@ if [[ "$JSON_OUTPUT" -eq 1 ]]; then
       installer_status: $installer_status,
       codeload_status: $codeload_status,
       codex_auth: {
+        package: $codex_auth_package,
         local: $codex_auth_local,
-        npm_latest: $codex_auth_latest,
+        npm_tag: $codex_auth_npm_tag,
+        npm_latest: $codex_auth_npm_latest,
+        github_repo: $codex_auth_github_repo,
+        github_latest: $codex_auth_github_latest,
+        github_latest_tag: $codex_auth_github_latest_tag,
+        latest: $codex_auth_latest,
         status: $codex_auth_status
       },
       codex_app: {
@@ -274,10 +392,19 @@ else
   printf '  latest:    %s\n' "${latest_revision:-unknown}"
   printf 'Installer raw URL: %s\n' "$installer_status"
   printf 'Codeload archive: %s\n' "$codeload_status"
-  printf 'codex-auth: local=%s npm_latest=%s status=%s\n' "${codex_auth_local:-unknown}" "${codex_auth_latest:-unknown}" "$codex_auth_status"
+  printf 'codex-auth: package=%s local=%s npm_%s=%s github_latest=%s status=%s\n' \
+    "${codex_auth_package:-unknown}" \
+    "${codex_auth_local:-unknown}" \
+    "$CODEX_AUTH_NPM_TAG" \
+    "${codex_auth_npm_latest:-unknown}" \
+    "${codex_auth_github_latest_tag:-unknown}" \
+    "$codex_auth_status"
   printf 'Codex.app: %s\n' "${codex_app_version:-unknown}"
   if [[ "$project_status" == "update_available" ]]; then
     printf '\nRun: codex-account-switch --self-update\n'
+  fi
+  if [[ "$codex_auth_status" == "update_available" ]]; then
+    printf '\nRun: codex-account-switch --update-upstreams\n'
   fi
 fi
 
