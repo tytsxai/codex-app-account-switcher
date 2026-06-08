@@ -39,10 +39,17 @@ Bash, Node.js ESM, jq, curl, macOS open/osascript, local filesystem operations u
 - `codex-app-relaunch.sh`: macOS Codex.app restart helper.
 - `scripts/install.sh`: installer and CLI wrapper creator.
 - `scripts/check-updates.sh`: project and dependency update checker.
+- `docs/architecture.md`: architecture, runtime data model, and main flows.
+- `docs/deployment.md`: local deployment, update, uninstall, and container/server boundaries.
+- `docs/configuration.md`: environment variable reference.
+- `docs/modules.md`: key modules, core logic, selection rules, cleanup rules.
 - `docs/security.md`: credential boundaries and public repository safety.
-- `docs/operations.md`: daily operations and troubleshooting.
+- `docs/operations.md`: daily operations, import, cleanup, and updates.
+- `docs/troubleshooting.md`: failure diagnosis and operational recovery.
+- `docs/maintenance.md`: maintainer handoff, OpenSpec workflow, validation, release checklist.
 - `docs/usage-examples.md`: practical command examples.
 - `docs/faq.md`: common limitations and behavior questions.
+- `openspec/project.md`: project OpenSpec context and specification workflow baseline.
 
 ## Keywords
 

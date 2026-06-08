@@ -92,6 +92,8 @@ APP_DIR="$HOME/.local/share/codex-app-account-switcher"
 "$HOME/.local/share/codex-app-account-switcher/codex-auth-import-json.mjs" --yes "$HOME/.codex/account-sources/source.json"
 ```
 
+Team/Business 账号必须来自完整登录快照，至少包含 `refresh_token`。只有 `access_token` 的导出最多只能临时读取 usage，不能作为可切换账号写入 `~/.codex/auth.json`。
+
 ### 4. 预演并切换
 
 ```bash
@@ -134,6 +136,7 @@ codex-account-switch --version
 ./codex-auth-import-json.mjs --dry-run ./path/to/source.json
 ./codex-auth-load-free.mjs --dry-run
 ./codex-auth-load-free.mjs --yes
+./codex-auth-load-free.mjs --all-plans --yes
 ```
 
 ## 使用场景 / Use Cases
@@ -170,17 +173,25 @@ CODEX_HOME="$HOME/.codex-test" codex-account-switch --dry-run
 - 本项目不会提供、生成或托管任何账号；所有凭证都必须来自你自己的本地文件。
 - 本项目不会绕过 OpenAI、ChatGPT 或 Codex 的服务限制，只会在你本地已有账号快照中选择实时可用账号。
 - usage、refresh 和 Codex.app 行为依赖非官方本地流程和相关 Web 端点，未来可能因上游变化而失效。
+- 缺少 `refresh_token` 的 access-only 来源会被诊断为 `missing_refresh_token` / `no_refresh_token`，不会参与自动切换。
 - 运行 `--relaunch` 会尝试关闭并重新打开 Codex.app；如果脚本检测到自己运行在 Codex.app 内部，会拒绝自动关闭当前会话。
 - 清理命令只删除确定性不可用状态，例如 auth 失败、缺少快照、缺少 refresh token 或套餐不在 `USABLE_PLANS`；网络失败不会自动删除。
 - 不要把 `~/.codex/auth.json`、`~/.codex/accounts/`、`*.auth.json`、来源 JSON 或归档文件提交到公开仓库。
 
 ## 文档 / Documentation
 
-- [docs/README.md](docs/README.md): documentation index
+- [docs/README.md](docs/README.md): documentation index and handoff reading order
+- [docs/architecture.md](docs/architecture.md): architecture, runtime data model, import/selection/relaunch flows
+- [docs/deployment.md](docs/deployment.md): local macOS deployment, update, uninstall, container/server boundaries
+- [docs/configuration.md](docs/configuration.md): environment variables, thresholds, paths, network and relaunch settings
+- [docs/modules.md](docs/modules.md): key scripts, responsibilities, core logic and extension points
 - [docs/operations.md](docs/operations.md): daily operations, import, cleanup, update, troubleshooting
+- [docs/troubleshooting.md](docs/troubleshooting.md): common failure modes and operational diagnostics
+- [docs/maintenance.md](docs/maintenance.md): maintainer handoff, OpenSpec workflow, validation and release checklist
 - [docs/security.md](docs/security.md): credential boundaries and public-repo safety
 - [docs/usage-examples.md](docs/usage-examples.md): practical command examples
 - [docs/faq.md](docs/faq.md): common questions and project limitations
+- [openspec/project.md](openspec/project.md): project OpenSpec context and local SDD baseline
 - [llms.txt](llms.txt): AI-search-friendly project summary
 
 ## 开发与自检 / Development
