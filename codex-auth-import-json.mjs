@@ -119,15 +119,19 @@ function safeFileName(value) {
   return String(value || 'unknown').replace(/[^A-Za-z0-9._@-]+/g, '_').slice(0, 160);
 }
 
-function authPayload(tokens) {
+function authPayload(tokens, email, chatgpt_user_id, chatgpt_account_id) {
   const out = {
     auth_mode: 'chatgpt',
+    email: email || null,
     last_refresh: new Date().toISOString(),
     tokens: {
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
       id_token: tokens.id_token,
       account_id: tokens.account_id,
+      chatgpt_account_id: chatgpt_account_id || tokens.account_id,
+      user_id: chatgpt_user_id || '',
+      chatgpt_user_id: chatgpt_user_id || '',
     },
   };
   for (const key of Object.keys(out.tokens)) {
@@ -243,6 +247,20 @@ async function fetchUsage(tokens) {
 
 async function validateCandidate(candidate) {
   let tokens = candidate.tokens;
+
+  if (!tokens.refresh_token) {
+    const accessClaims = jwtPayload(tokens.access_token);
+    const idClaims = jwtPayload(tokens.id_token);
+    const authClaims = accessClaims['https://api.openai.com/auth'] || idClaims['https://api.openai.com/auth'] || {};
+    return {
+      ...candidate,
+      valid: false,
+      status: 'missing_refresh_token',
+      error: 'switchable auth snapshot requires refresh_token',
+      detected_plan: lower(authClaims.chatgpt_plan_type || ''),
+    };
+  }
+
   let usageResult = await fetchUsage(tokens);
   let refreshed = false;
 
@@ -258,6 +276,19 @@ async function validateCandidate(candidate) {
 
   if (!usageResult.ok) {
     return { ...candidate, valid: false, status: usageResult.status, error: '' };
+  }
+
+  if (!tokens.id_token) {
+    const refreshResult = await refreshTokens(tokens);
+    if (!refreshResult.ok) {
+      return { ...candidate, valid: false, status: refreshResult.status, error: refreshResult.error || '' };
+    }
+    tokens = refreshResult.tokens;
+    refreshed = true;
+    usageResult = await fetchUsage(tokens);
+    if (!usageResult.ok) {
+      return { ...candidate, valid: false, status: usageResult.status, error: '' };
+    }
   }
 
   const accessClaims = jwtPayload(tokens.access_token);
@@ -426,9 +457,10 @@ if (!dryRun && validAccounts.length > 0) {
   fs.mkdirSync(ACCOUNTS_DIR, { recursive: true });
   const registry = upsertAccounts(loadRegistry(), validAccounts);
   for (const account of validAccounts) {
-    fs.writeFileSync(accountFileForKey(account.account_key), `${JSON.stringify(authPayload(account.tokens), null, 2)}\n`);
+    const payload = authPayload(account.tokens, account.email, account.chatgpt_user_id, account.chatgpt_account_id);
+    fs.writeFileSync(accountFileForKey(account.account_key), `${JSON.stringify(payload, null, 2)}\n`);
     if (registry.active_account_key === account.account_key) {
-      fs.writeFileSync(ACTIVE_AUTH_FILE, `${JSON.stringify(authPayload(account.tokens), null, 2)}\n`);
+      fs.writeFileSync(ACTIVE_AUTH_FILE, `${JSON.stringify(payload, null, 2)}\n`);
     }
   }
   const tmp = `${REGISTRY_FILE}.tmp.${process.pid}`;
@@ -466,6 +498,7 @@ console.log(JSON.stringify({
     email: item.email || '',
     status: item.status,
     error: item.error || '',
+    detected_plan: item.detected_plan || null,
     source_file: item.file,
   })),
 }, null, 2));

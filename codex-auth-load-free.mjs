@@ -20,6 +20,7 @@ const DEFAULT_DIRS = [
 let dryRun = false;
 let yes = false;
 let scanAll = false;
+let allPlans = false;
 const explicitPaths = [];
 const scanWarnings = [];
 
@@ -28,6 +29,7 @@ for (let i = 2; i < process.argv.length; i += 1) {
   if (arg === '--dry-run') dryRun = true;
   else if (arg === '--yes' || arg === '-y') yes = true;
   else if (arg === '--scan-all') scanAll = true;
+  else if (arg === '--all-plans') allPlans = true;
   else if (arg === '--help' || arg === '-h') {
     usage();
     process.exit(0);
@@ -38,13 +40,14 @@ for (let i = 2; i < process.argv.length; i += 1) {
 
 function usage() {
   console.log(`Usage:
-  codex-auth-load-free.mjs [--dry-run] [--yes] [--scan-all] [file-or-dir...]
+  codex-auth-load-free.mjs [--dry-run] [--yes] [--scan-all] [--all-plans] [file-or-dir...]
 
 Behavior:
   - Scans common local source folders for Codex auth JSON files
   - Locally prefilters files whose access token declares chatgpt_plan_type=free
-  - Validates those Free candidates through the normal import script
-  - Imports only live Free accounts whose ChatGPT usage API can be read
+  - Use --all-plans to include non-free accounts (Plus, Pro, Team, Business)
+  - Validates those candidates through the normal import script
+  - Imports only live accounts whose ChatGPT usage API can be read
 
 Default scan dirs:
   ~/Downloads
@@ -200,7 +203,7 @@ for (const file of files) {
 
   const plans = tokens.map(declaredPlan).filter(Boolean);
   const hasDeclaredFree = plans.includes('free');
-  if (!scanAll && !hasDeclaredFree) continue;
+  if (!allPlans && !scanAll && !hasDeclaredFree) continue;
 
   if (!seenFiles.has(file)) {
     seenFiles.add(file);
@@ -213,7 +216,8 @@ for (const file of files) {
   }
 }
 
-const args = [IMPORT_SCRIPT, '--only-plan', 'free'];
+const args = [IMPORT_SCRIPT];
+if (!allPlans) args.push('--only-plan', 'free');
 if (dryRun) args.push('--dry-run');
 if (yes) args.push('--yes');
 for (const candidate of candidates) args.push(candidate.file);

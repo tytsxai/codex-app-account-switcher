@@ -202,9 +202,60 @@ auth_file_needs_update() {
   [[ ! -f "$ACTIVE_AUTH_FILE" ]] || ! cmp -s "$target_auth_file" "$ACTIVE_AUTH_FILE"
 }
 
+auth_file_needs_identity_update() {
+  local target_auth_file="$1"
+  local target_email="${2:-}"
+  local target_user_id="${3:-}"
+  local target_account_id="${4:-}"
+
+  ! jq -e \
+    --arg email "$target_email" \
+    --arg user_id "$target_user_id" \
+    --arg account_id "$target_account_id" \
+    '
+      (($email == "") or (.email == $email))
+      and (($account_id == "") or (.tokens.account_id == $account_id and .tokens.chatgpt_account_id == $account_id))
+      and (($user_id == "") or (.tokens.user_id == $user_id and .tokens.chatgpt_user_id == $user_id))
+    ' "$target_auth_file" >/dev/null 2>&1
+}
+
 install_active_auth_file() {
   local target_auth_file="$1"
-  local active_auth_tmp
+  local target_email="${2:-}"
+  local target_user_id="${3:-}"
+  local target_account_id="${4:-}"
+  local active_auth_tmp normalized_tmp now_iso
+
+  normalized_tmp="$target_auth_file.normalized.$$"
+  now_iso="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  if ! jq \
+    --arg email "$target_email" \
+    --arg user_id "$target_user_id" \
+    --arg account_id "$target_account_id" \
+    --arg now_iso "$now_iso" \
+    '
+      .auth_mode = "chatgpt"
+      | .tokens = (.tokens // {})
+      | (if $email != "" then .email = $email else . end)
+      | (if (.last_refresh // "") == "" then .last_refresh = $now_iso else . end)
+      | (if $account_id != "" then
+          .tokens.account_id = $account_id
+          | .tokens.chatgpt_account_id = $account_id
+        else
+          .
+        end)
+      | (if $user_id != "" then
+          .tokens.user_id = $user_id
+          | .tokens.chatgpt_user_id = $user_id
+        else
+          .
+        end)
+    ' "$target_auth_file" >"$normalized_tmp"; then
+    rm -f "$normalized_tmp"
+    printf 'active auth file normalization failed: %s\n' "$target_auth_file" >&2
+    exit 1
+  fi
+  mv "$normalized_tmp" "$target_auth_file"
 
   active_auth_tmp="$CODEX_HOME_DIR/auth.json.tmp.$$"
   cp "$target_auth_file" "$active_auth_tmp"
@@ -328,7 +379,7 @@ collect_account_record() {
   local account_json="$1"
   local output_file="$2"
 
-  local account_key email plan fallback_usage_json auth_file usage_payload
+  local account_key email plan fallback_usage_json auth_file usage_payload refresh_token
   account_key="$(jq -r '.account_key' <<<"$account_json")"
   email="$(jq -r '.email // ""' <<<"$account_json")"
   plan="$(jq -r '.plan // "unknown"' <<<"$account_json")"
@@ -345,7 +396,12 @@ collect_account_record() {
     return 0
   fi
 
-  usage_payload="$(fetch_usage_json "$auth_file" "$fallback_usage_json" "$plan")"
+  refresh_token="$(jq -r '.tokens.refresh_token // empty' "$auth_file" 2>/dev/null || true)"
+  if [[ -z "$refresh_token" ]]; then
+    usage_payload="$(jq -cn --argjson usage "$fallback_usage_json" '{source:"no_refresh_token", usage:$usage}')"
+  else
+    usage_payload="$(fetch_usage_json "$auth_file" "$fallback_usage_json" "$plan")"
+  fi
 
   local tmp_out="$output_file.tmp"
   if jq -cn \
@@ -851,6 +907,8 @@ if [[ -n "$USE_PLAN" ]]; then
 
   target_key="$(jq -r '.selected_account_key // ""' "$USE_PLAN")"
   target_auth_file="$(jq -r '.selected_auth_file // ""' "$USE_PLAN")"
+  target_user_id="${target_key%%::*}"
+  target_account_id="${target_key##*::}"
   [[ -n "$target_key" ]] || {
     printf 'invalid plan: missing selected_account_key\n' >&2
     exit 1
@@ -994,12 +1052,14 @@ if [[ -n "$USE_PLAN" ]]; then
   fi
 
   changed=0
-  if [[ "$target_key" != "$active_key" ]] || auth_file_needs_update "$target_auth_file"; then
+  if [[ "$target_key" != "$active_key" ]] ||
+     auth_file_needs_update "$target_auth_file" ||
+     auth_file_needs_identity_update "$target_auth_file" "$target_email" "$target_user_id" "$target_account_id"; then
     changed=1
   fi
 
   if [[ "$DRY_RUN" -eq 0 ]] && [[ "$changed" -eq 1 ]]; then
-    install_active_auth_file "$target_auth_file"
+    install_active_auth_file "$target_auth_file" "$target_email" "$target_user_id" "$target_account_id"
 
     registry_tmp="$tmp_dir/registry.json.tmp"
     jq \
@@ -1387,6 +1447,12 @@ target_key="$(jq -r '.account_key' "$selected_json")"
 target_email="$(jq -r '.email // ""' "$selected_json")"
 target_alias="$(jq -r '.alias // ""' "$selected_json")"
 target_account_name="$(jq -r '.account_name // ""' "$selected_json")"
+target_user_id="$(jq -r '.chatgpt_user_id // ""' "$selected_json")"
+target_account_id="$(jq -r '.chatgpt_account_id // ""' "$selected_json")"
+if [[ -z "$target_user_id" || -z "$target_account_id" ]]; then
+  target_user_id="${target_key%%::*}"
+  target_account_id="${target_key##*::}"
+fi
 target_plan="$(jq -r '.effective_plan // .plan // "unknown"' "$selected_json")"
 target_fiveh="$(jq -r '.fiveh_remaining // -1' "$selected_json")"
 target_weekly="$(jq -r '.weekly_remaining // -1' "$selected_json")"
@@ -1404,7 +1470,9 @@ elif [[ -n "$target_account_name" ]]; then
 fi
 
 changed=0
-if [[ "$target_key" != "$active_key" ]] || auth_file_needs_update "$target_auth_file"; then
+if [[ "$target_key" != "$active_key" ]] ||
+   auth_file_needs_update "$target_auth_file" ||
+   auth_file_needs_identity_update "$target_auth_file" "$target_email" "$target_user_id" "$target_account_id"; then
   changed=1
 fi
 
@@ -1412,7 +1480,7 @@ target_usage_file="$tmp_dir/target-usage.json"
 jq '.usage' "$selected_json" >"$target_usage_file"
 
 if [[ "$DRY_RUN" -eq 0 ]] && [[ "$changed" -eq 1 ]]; then
-  install_active_auth_file "$target_auth_file"
+  install_active_auth_file "$target_auth_file" "$target_email" "$target_user_id" "$target_account_id"
 
   registry_tmp="$tmp_dir/registry.json.tmp"
   jq \

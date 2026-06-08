@@ -16,6 +16,10 @@ No. It reads live usage and chooses from accounts you already control. It does n
 
 Cached registry data can be stale. The switcher treats API-readable usage as the source of truth before selecting or writing an account, which reduces failed switches caused by expired tokens or exhausted quota.
 
+## Why can a Team account be detected but not switched?
+
+The source is usually access-only. Usage can sometimes be read with a still-valid `access_token`, but Codex.app needs a switchable auth snapshot with `refresh_token` and account identity fields. Re-import a complete login snapshot instead of an access-only export.
+
 ## Why does it restart Codex.app?
 
 Codex.app reads the active auth state from local files. Restarting the app is the reliable way for the desktop app to pick up the newly written `~/.codex/auth.json`.

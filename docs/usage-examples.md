@@ -54,14 +54,17 @@ mkdir -p "$HOME/.codex/account-sources"
 
 Supported source shapes include `codex-auth` snapshots, `codex-sub2api` exports, and flat token JSON. The importer writes only accounts that pass live identity and usage checks.
 
+For Team/Business accounts, use a complete auth snapshot that includes `refresh_token`. Access-only exports can make usage detection look healthy, but they are rejected for switching because Codex.app cannot reliably use them as the active session.
+
 ## Load Free Candidates From Local Folders
 
 ```bash
 ./codex-auth-load-free.mjs --dry-run
 ./codex-auth-load-free.mjs --yes
+./codex-auth-load-free.mjs --all-plans --yes
 ```
 
-The loader locally prefilters files that declare `chatgpt_plan_type=free`, then forwards them to the importer with `--only-plan free`.
+The loader locally prefilters files that declare `chatgpt_plan_type=free`, then forwards them to the importer with `--only-plan free`. `--all-plans` disables the Free-only filter and forwards Plus/Pro/Team/Business candidates too.
 
 ## Cleanup Unusable Accounts
 

@@ -31,14 +31,17 @@ Importer accepts:
 
 Run with `--dry-run` first. Use `--yes` only after live validation succeeds.
 
+For Team/Business accounts, live usage alone is not enough. The source must include a `refresh_token` so Codex.app can keep the session usable after the switch. Access-only exports are reported as `missing_refresh_token` during import or `no_refresh_token` in the pool diagnostics and are not selected for switching.
+
 ## Load Free Accounts
 
 ```bash
 ./codex-auth-load-free.mjs --dry-run
 ./codex-auth-load-free.mjs --yes
+./codex-auth-load-free.mjs --all-plans --yes
 ```
 
-The loader scans common private local folders and only forwards Free candidates to the importer.
+The loader scans common private local folders and normally forwards only Free candidates to the importer. Use `--all-plans` when you intentionally want to import Plus/Pro/Team/Business snapshots from the same local source folders.
 
 Default scan roots include `~/Downloads`, `~/.codex/account-sources`, `~/Documents/codex-accounts`, `~/Documents/账号codex`, and related local archive folders. Use `--scan-all` only when local token claims are missing or stale, because it validates more files live.
 

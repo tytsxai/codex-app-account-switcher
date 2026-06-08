@@ -60,6 +60,16 @@ cat >"$fixture" <<'JSON'
     "weekly_remaining": 100,
     "weekly_limit_present": true,
     "last_usage_at": 400
+  },
+  {
+    "account_key": "access-only-plus",
+    "email": "access-only-plus@example.invalid",
+    "effective_plan": "plus",
+    "source": "no_refresh_token",
+    "fiveh_remaining": 100,
+    "weekly_remaining": 100,
+    "weekly_limit_present": true,
+    "last_usage_at": 500
   }
 ]
 JSON
@@ -187,8 +197,8 @@ excluded_count="$(jq -r '.excluded_count' "$pool")"
   exit 1
 }
 
-[[ "$stale_count" == "1" ]] || {
-  printf 'expected stale_count=1, got %s\n' "$stale_count" >&2
+[[ "$stale_count" == "2" ]] || {
+  printf 'expected stale_count=2, got %s\n' "$stale_count" >&2
   exit 1
 }
 

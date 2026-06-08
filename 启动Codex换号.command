@@ -181,7 +181,7 @@ preload_plan() {
   rm -f "$PLAN_FILE" "$tmp_plan"
 
   set +e
-  SHOW_ALL_ACCOUNTS=1 "$AUTH_SCRIPT" --dry-run --json --verbose >"$tmp_plan"
+  SHOW_ALL_ACCOUNTS=1 "$AUTH_SCRIPT" --dry-run --json --verbose --include-active >"$tmp_plan"
   local preload_exit=$?
   set -e
 
@@ -214,6 +214,7 @@ print_shortcuts() {
   printf '  t          codex-auth status\n'
   printf '  c          codex-auth clean\n'
   printf '  f          扫描并导入有额度的 Free 账号\n'
+  printf '  F          扫描并导入所有类型的账号 (含 Team/Plus)\n'
   printf '  u          检查不可用账号，不删除\n'
   printf '  x          清理不可用账号，需要二次确认\n'
   printf '  r          重新预加载账号池\n'
@@ -365,6 +366,12 @@ handle_shortcut() {
       ;;
     f|free|load-free)
       run_logged_command "[维护命令] 扫描并导入 Free 账号" "$FREE_LOAD_SCRIPT" --yes || true
+      show_home
+      PRO_EMAIL="$(resolve_pro_email)"
+      return 0
+      ;;
+    F|all|load-all)
+      run_logged_command "[维护命令] 扫描并导入所有账号 (含付费/Team)" "$FREE_LOAD_SCRIPT" --all-plans --yes || true
       show_home
       PRO_EMAIL="$(resolve_pro_email)"
       return 0
