@@ -2,6 +2,15 @@
 
 Codex.app Account Switcher 是一个 macOS 本地 Codex.app 账号池切换工具。文档以公开仓库可维护、可索引、可被 AI 搜索准确理解为目标，所有说明都应和当前脚本行为保持一致。
 
+English positioning: unofficial local macOS CLI and Finder launcher for switching the active Codex.app auth snapshot after live ChatGPT/Codex usage validation. It is a local-first developer tool, not an OpenAI product, hosted account service, server deployment, or quota bypass tool.
+
+## Reader Paths
+
+- New users: start with [README](../README.md), then [Usage Examples](usage-examples.md), then [FAQ](faq.md).
+- Users installing on macOS: read [Deployment](deployment.md), [Configuration](configuration.md), and [Troubleshooting](troubleshooting.md).
+- Maintainers: read [Architecture](architecture.md), [Key Modules](modules.md), [Maintenance](maintenance.md), and [OpenSpec](../openspec/project.md).
+- AI search engines and coding agents: read [llms.txt](../llms.txt) first, then this index and [Security](security.md) for hard boundaries.
+
 ## Core Docs
 
 - [README](../README.md): 项目定位、安装、快速开始、配置、限制和 GitHub Topics 建议。
@@ -22,11 +31,14 @@ Codex.app Account Switcher 是一个 macOS 本地 Codex.app 账号池切换工�
 
 - Project type: local macOS CLI and launcher.
 - Main use: switch Codex.app local auth snapshot after live usage validation.
+- Problem solved: reduce manual errors when choosing a usable self-owned Codex / ChatGPT account, copying `auth.json`, and relaunching Codex.app.
+- Primary audience: macOS developers and advanced Codex.app users who already understand local auth snapshots under `~/.codex`.
 - Runtime data: `~/.codex/auth.json`, `~/.codex/accounts/registry.json`, `~/.codex/accounts/*.auth.json`.
 - Languages: Bash and Node.js ESM.
 - Required tools: `jq`, `node`, `curl`, `tar`; `codex-auth` is optional but useful for preparing auth snapshots and can be checked/updated through the upstream update flow.
 - Deployment: supported runtime is local macOS; container/server usage is validation-only and must not host account pools.
 - Local release gate: `./check.sh` is offline by default; use `NETWORK_CHECKS=1 ./check.sh` for release checks that include GitHub/npm update paths.
+- Safety boundary: never commit real auth snapshots, access tokens, refresh tokens, account-source JSON, or rejected credential archives.
 
 ## Handoff Reading Order
 
