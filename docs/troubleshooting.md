@@ -59,6 +59,7 @@ Dry run first:
 
 Common import statuses:
 
+- `dry_run_refresh_required`: dry-run could not validate without refreshing tokens. Confirm the source, then rerun with `--yes`.
 - `missing_refresh_token`: source is access-only and cannot be switched.
 - `refresh_http_400`, `refresh_http_401`: refresh token is rejected.
 - `usage_http_401`: access token failed and refresh did not produce usable usage.

@@ -94,6 +94,8 @@ APP_DIR="$HOME/.local/share/codex-app-account-switcher"
 
 Team/Business 账号必须来自完整登录快照，至少包含 `refresh_token`。只有 `access_token` 的导出最多只能临时读取 usage，不能作为可切换账号写入 `~/.codex/auth.json`。
 
+Import dry run 不刷新 token、不写账号池；如果候选账号必须刷新 token 才能验证，会返回 `dry_run_refresh_required`，确认来源无误后再用 `--yes` 做真实导入。
+
 ### 4. 预演并切换
 
 ```bash
@@ -101,7 +103,7 @@ codex-account-switch --dry-run
 codex-account-switch --relaunch
 ```
 
-`--dry-run` 只查看将要选择的账号和账号池状态，不改写文件；`--relaunch` 会切换 `~/.codex/auth.json` 并重启 Codex.app。
+`--dry-run` 不切换 active auth，也不重启 Codex.app。为了避免 refresh token 轮换后本地快照失效，switcher 在实时校验时可能会保存刷新后的账号快照；`--relaunch` 会切换 `~/.codex/auth.json` 并重启 Codex.app。
 
 ## 常用命令 / Common Commands
 
@@ -109,7 +111,7 @@ codex-account-switch --relaunch
 # 交互启动器
 codex-account-switch
 
-# 只预演，不写入账号文件
+# 只预演，不切换 active auth / 不重启
 codex-account-switch --dry-run
 
 # 切换账号并重启 Codex.app

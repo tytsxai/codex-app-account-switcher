@@ -54,6 +54,8 @@ mkdir -p "$HOME/.codex/account-sources"
 
 Supported source shapes include `codex-auth` snapshots, `codex-sub2api` exports, and flat token JSON. The importer writes only accounts that pass live identity and usage checks.
 
+Importer dry-run does not refresh tokens or write account state. If it reports `dry_run_refresh_required`, rerun with `--yes` only after confirming the source file is trusted.
+
 For Team/Business accounts, use a complete auth snapshot that includes `refresh_token`. Access-only exports can make usage detection look healthy, but they are rejected for switching because Codex.app cannot reliably use them as the active session.
 
 ## Load Free Candidates From Local Folders

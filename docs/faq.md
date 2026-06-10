@@ -26,7 +26,7 @@ Codex.app reads the active auth state from local files. Restarting the app is th
 
 ## Can I run it from inside Codex.app?
 
-Dry runs are safe. For `--relaunch`, the relaunch script detects when it is running inside Codex.app and refuses to close the current host process. Run the desktop launcher or a normal terminal for real relaunches.
+Dry runs do not relaunch Codex.app. Switcher dry-runs can still save refreshed account snapshots if live validation rotates tokens, so run them only against your own local account pool. For `--relaunch`, the relaunch script detects when it is running inside Codex.app and refuses to close the current host process. Run the desktop launcher or a normal terminal for real relaunches.
 
 ## What happens to rejected source files?
 
@@ -35,6 +35,8 @@ Rejected source files can be copied into `~/.codex/accounts-invalid-sources` for
 ## What files are modified during a real switch?
 
 The core write target is `~/.codex/auth.json`. Account import and cleanup commands may also update `~/.codex/accounts/registry.json` and `~/.codex/accounts/*.auth.json`.
+
+During switcher dry-run, `~/.codex/accounts/*.auth.json` may be updated if the usage check rotates tokens. Import dry-run does not refresh tokens or write account state.
 
 ## Can this run on Linux or Windows?
 

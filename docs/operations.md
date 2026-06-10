@@ -7,7 +7,7 @@ codex-account-switch --dry-run
 codex-account-switch --relaunch
 ```
 
-The first command previews the selected account and pool state. The second command switches `~/.codex/auth.json` and restarts Codex.app.
+The first command previews the selected account and pool state without switching active auth or relaunching Codex.app. It can still persist refreshed account snapshots if live validation rotates tokens. The second command switches `~/.codex/auth.json` and restarts Codex.app.
 
 日常建议先 dry run，确认账号池可用数量、选中账号、5h 剩余和 weekly 剩余后，再执行真实切换。
 
@@ -29,7 +29,7 @@ Importer accepts:
 - `codex-sub2api` export JSON with an `accounts` array.
 - Flat token JSON containing access/refresh/id token fields.
 
-Run with `--dry-run` first. Use `--yes` only after live validation succeeds.
+Run with `--dry-run` first. Import dry-run does not refresh tokens or write account state; if an account needs refresh to validate, it is reported as `dry_run_refresh_required`. Use `--yes` only after the source is trusted, because real validation may rotate refresh tokens and must persist them.
 
 For Team/Business accounts, live usage alone is not enough. The source must include a `refresh_token` so Codex.app can keep the session usable after the switch. Access-only exports are reported as `missing_refresh_token` during import or `no_refresh_token` in the pool diagnostics and are not selected for switching.
 
