@@ -25,7 +25,7 @@ git diff --stat
 
 - Preserve local-first behavior. Do not add a server, hosted pool, telemetry, or remote credential upload.
 - Keep Bash for macOS orchestration and Node.js ESM for structured JSON parsing/import logic.
-- Keep side effects behind explicit commands: `--dry-run` must not write account state.
+- Keep side effects explicit: import dry-run must not refresh or write; switch dry-run must not switch active auth or relaunch, but may save refreshed account snapshots when live validation rotates tokens.
 - Keep live usage as the selection source of truth.
 - Do not clean network failures automatically.
 - Update relevant docs under `docs/` whenever code behavior changes.

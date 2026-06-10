@@ -6,6 +6,9 @@ ACCOUNTS_DIR="$CODEX_HOME_DIR/accounts"
 REGISTRY_FILE="$ACCOUNTS_DIR/registry.json"
 ACTIVE_AUTH_FILE="$CODEX_HOME_DIR/auth.json"
 INVALID_ARCHIVE_ROOT="${INVALID_ARCHIVE_ROOT:-$CODEX_HOME_DIR/accounts-invalid-archive}"
+ACCOUNT_LOCK_DIR="${CODEX_ACCOUNT_LOCK_DIR:-$ACCOUNTS_DIR/.codex-app-hot-switch.lock}"
+ACCOUNT_LOCK_HELD=0
+tmp_dir=""
 
 MIN_5H_REMAIN="${MIN_5H_REMAIN:-10}"
 MIN_WEEKLY_REMAIN="${MIN_WEEKLY_REMAIN:-5}"
@@ -89,6 +92,62 @@ debug() {
   if [[ "$VERBOSE" -eq 1 ]] && [[ "$JSON_OUTPUT" -eq 0 ]]; then
     printf '[debug] %s\n' "$*" >&2
   fi
+}
+
+cleanup() {
+  [[ -z "${tmp_dir:-}" ]] || rm -rf "$tmp_dir"
+  if [[ "$ACCOUNT_LOCK_HELD" -eq 1 ]]; then
+    rm -rf "$ACCOUNT_LOCK_DIR"
+  fi
+}
+
+trap cleanup EXIT
+
+acquire_account_lock() {
+  local existing_pid
+
+  mkdir -p "$ACCOUNTS_DIR"
+  if [[ "${CODEX_ACCOUNT_LOCK_HELD:-}" == "$ACCOUNT_LOCK_DIR" ]]; then
+    debug "account state lock already held by parent: $ACCOUNT_LOCK_DIR"
+    return 0
+  fi
+
+  if mkdir "$ACCOUNT_LOCK_DIR" 2>/dev/null; then
+    ACCOUNT_LOCK_HELD=1
+    printf '%s\n' "$$" >"$ACCOUNT_LOCK_DIR/pid"
+    {
+      printf 'pid=%s\n' "$$"
+      printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      printf 'owner=codex-auth-smart-switch\n'
+    } >"$ACCOUNT_LOCK_DIR/owner"
+    export CODEX_ACCOUNT_LOCK_HELD="$ACCOUNT_LOCK_DIR"
+    return 0
+  fi
+
+  existing_pid="$(sed -n 's/^pid=//p' "$ACCOUNT_LOCK_DIR/owner" 2>/dev/null | head -n 1 || true)"
+  if [[ -z "$existing_pid" ]]; then
+    existing_pid="$(cat "$ACCOUNT_LOCK_DIR/pid" 2>/dev/null || true)"
+  fi
+  if [[ "$existing_pid" =~ ^[0-9]+$ ]] && kill -0 "$existing_pid" >/dev/null 2>&1; then
+    printf '已有账号状态操作正在运行 (pid %s)，请等待上一轮完成。\n' "$existing_pid" >&2
+    exit 1
+  fi
+
+  rm -rf "$ACCOUNT_LOCK_DIR"
+  if mkdir "$ACCOUNT_LOCK_DIR" 2>/dev/null; then
+    ACCOUNT_LOCK_HELD=1
+    printf '%s\n' "$$" >"$ACCOUNT_LOCK_DIR/pid"
+    {
+      printf 'pid=%s\n' "$$"
+      printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      printf 'owner=codex-auth-smart-switch\n'
+    } >"$ACCOUNT_LOCK_DIR/owner"
+    export CODEX_ACCOUNT_LOCK_HELD="$ACCOUNT_LOCK_DIR"
+    return 0
+  fi
+
+  printf '无法创建账号状态锁：%s\n' "$ACCOUNT_LOCK_DIR" >&2
+  exit 1
 }
 
 emit_summary_json() {
@@ -176,7 +235,8 @@ print_switch_summary() {
   local changed="${11}"
 
   if [[ "$dry_run" -eq 1 ]]; then
-    printf 'Dry run only, no files changed.\n'
+    printf 'Dry run only, active auth and Codex.app were not changed.\n'
+    printf 'Live validation may persist refreshed account snapshots if tokens rotate.\n'
   elif [[ "$changed" -eq 1 ]]; then
     printf '已切换到可用账号。\n'
   else
@@ -717,6 +777,8 @@ fi
   exit 1
 }
 
+acquire_account_lock
+
 if [[ ! -f "$ACTIVE_AUTH_FILE" ]]; then
   bootstrap_active_key="$(jq -r '.active_account_key // ""' "$REGISTRY_FILE" 2>/dev/null || true)"
   if [[ -n "$bootstrap_active_key" ]]; then
@@ -728,7 +790,6 @@ if [[ ! -f "$ACTIVE_AUTH_FILE" ]]; then
 fi
 
 tmp_dir="$(mktemp -d)"
-trap 'rm -rf "$tmp_dir"' EXIT
 
 accounts_jsonl="$tmp_dir/accounts.jsonl"
 ranked_json="$tmp_dir/ranked.json"
@@ -848,7 +909,7 @@ if [[ "$CLEANUP_INVALID" -eq 1 ]]; then
       printf '\n以下账号将被清理 (registry 条目 + auth 文件):\n'
       jq -rn --argjson dead "$dead_keys_json" '$dead[] | "  - \(.email // .account_key)  [\(.status)]"'
       if [[ "$DRY_RUN" -eq 1 ]]; then
-        printf '\nDry run，未做任何修改。\n'
+        printf '\nDry run，未删除账号或更新 registry。实时探测如发生 token 轮换，可能已保存刷新后的账号快照。\n'
       else
         printf '\n如确认清理，请加 --yes 重新执行。\n'
       fi

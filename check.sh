@@ -82,6 +82,20 @@ else
   fail=$((fail + 1))
 fi
 
+if [[ -x ./tests/state-lock-fixtures.sh ]]; then
+  ran=$((ran + 1))
+  if ./tests/state-lock-fixtures.sh >"$check_err" 2>&1; then
+    log_ok "tests/state-lock-fixtures.sh"
+  else
+    log_err "tests/state-lock-fixtures.sh"
+    sed 's/^/    /' "$check_err"
+    fail=$((fail + 1))
+  fi
+else
+  log_err "tests/state-lock-fixtures.sh 不存在或不可执行"
+  fail=$((fail + 1))
+fi
+
 log_step "shellcheck（静态分析）"
 if ! command -v shellcheck >/dev/null 2>&1; then
   log_warn "shellcheck 未安装，跳过（brew install shellcheck）"

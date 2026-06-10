@@ -7,6 +7,7 @@ Configuration is intentionally environment-variable based. There is no project-l
 | Variable | Default | Used By | Purpose |
 | --- | --- | --- | --- |
 | `CODEX_HOME` | `~/.codex` | switcher, importer, launcher | Root for active auth, account registry, and account snapshots. |
+| `CODEX_ACCOUNT_LOCK_DIR` | `$CODEX_HOME/accounts/.codex-app-hot-switch.lock` | switcher, importer, launcher | Shared account-state lock directory. Override only for tests or isolated maintenance. |
 | `INVALID_SOURCE_ROOT` | `$CODEX_HOME/accounts-invalid-sources` | importer | Archive root for rejected import source files. |
 | `INVALID_ARCHIVE_ROOT` | `$CODEX_HOME/accounts-invalid-archive` | switcher cleanup | Archive root for cleaned account snapshots. |
 | `INSTALL_DIR` | `~/.local/share/codex-app-account-switcher` | installer, update checker | Installed app files. |

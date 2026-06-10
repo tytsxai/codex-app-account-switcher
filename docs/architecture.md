@@ -27,6 +27,7 @@ Runtime state lives outside the repository by default:
 - `~/.codex/auth.json`: Codex.app active auth snapshot. Real switching writes this file atomically through a temp file and verifies it with `cmp`.
 - `~/.codex/accounts/registry.json`: account registry, including active account key, account metadata, last usage snapshot, and last-used timestamps.
 - `~/.codex/accounts/*.auth.json`: switchable auth snapshots. File names are base64-encoded from `chatgpt_user_id::chatgpt_account_id`.
+- `~/.codex/accounts/.codex-app-hot-switch.lock`: shared account-state lock used by hot-switch, direct switcher runs, cleanup, and real imports.
 - `~/.codex/accounts-invalid-sources/`: rejected import source archive.
 - `~/.codex/accounts-invalid-archive/`: cleanup archive for removed unusable accounts.
 
@@ -38,10 +39,11 @@ The repository must stay credential-free. Only examples and docs belong here.
 
 1. `codex-auth-import-json.mjs` parses source JSON from `codex-auth`, `codex-sub2api`, or flat token exports.
 2. Candidates without `refresh_token` are rejected as `missing_refresh_token`; access-only sources are not switchable.
-3. The importer reads live usage. If needed, it refreshes tokens once through the OAuth refresh endpoint.
+3. The importer reads live usage. For real imports, if needed, it refreshes tokens once through the OAuth refresh endpoint.
 4. Valid candidates must have live usage plus email, user id, and account id.
-5. With `--yes`, the importer writes account auth snapshots and upserts `registry.json`.
-6. Invalid source files are archived for traceability when the source file contains no valid imported account.
+5. Import dry-run does not refresh tokens or write account state; candidates that require refresh are reported as `dry_run_refresh_required`.
+6. With `--yes`, the importer writes account auth snapshots and upserts `registry.json`.
+7. Invalid source files are archived for traceability when the source file contains no valid imported account.
 
 ### Account Selection
 
@@ -57,7 +59,7 @@ The repository must stay credential-free. Only examples and docs belong here.
 
 ### Hot Switch and Relaunch
 
-1. `codex-app-hot-switch.sh` acquires `~/.codex/accounts/.codex-app-hot-switch.lock`.
+1. `codex-app-hot-switch.sh` acquires the shared account-state lock and delegates it to the child switcher.
 2. It runs the switcher in JSON mode and handles preload fallback when a cached selection plan is stale.
 3. In `--switch-only` mode it stops after the auth write.
 4. In `--relaunch` mode it calls `codex-app-relaunch.sh`.
@@ -70,6 +72,7 @@ The project intentionally refuses ambiguous state:
 - Stale registry usage is never trusted for selecting an account.
 - Access-only snapshots can be diagnosed but cannot be selected.
 - Network failures are not cleanup candidates.
+- Concurrent account-state writes fail closed on the shared lock instead of trying to merge divergent state.
 - Relaunch failure does not roll back a completed auth switch; the user can manually reopen Codex.app.
 - Cleanup archives are written outside the active pool so evidence survives `codex-auth clean`.
 

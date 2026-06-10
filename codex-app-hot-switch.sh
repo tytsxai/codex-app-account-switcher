@@ -6,7 +6,7 @@ SWITCH_SCRIPT="$SCRIPT_DIR/codex-auth-smart-switch.sh"
 RELAUNCH_SCRIPT="$SCRIPT_DIR/codex-app-relaunch.sh"
 CODEX_HOME_DIR="${CODEX_HOME:-$HOME/.codex}"
 ACCOUNTS_DIR="$CODEX_HOME_DIR/accounts"
-LOCK_DIR="$ACCOUNTS_DIR/.codex-app-hot-switch.lock"
+LOCK_DIR="${CODEX_ACCOUNT_LOCK_DIR:-$ACCOUNTS_DIR/.codex-app-hot-switch.lock}"
 LOCK_HELD=0
 
 DRY_RUN=0
@@ -46,12 +46,22 @@ acquire_lock() {
   if mkdir "$LOCK_DIR" 2>/dev/null; then
     LOCK_HELD=1
     printf '%s\n' "$$" >"$LOCK_DIR/pid"
+    {
+      printf 'pid=%s\n' "$$"
+      printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      printf 'owner=codex-app-hot-switch\n'
+    } >"$LOCK_DIR/owner"
+    export CODEX_ACCOUNT_LOCK_DIR="$LOCK_DIR"
+    export CODEX_ACCOUNT_LOCK_HELD="$LOCK_DIR"
     return 0
   fi
 
-  existing_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+  existing_pid="$(sed -n 's/^pid=//p' "$LOCK_DIR/owner" 2>/dev/null | head -n 1 || true)"
+  if [[ -z "$existing_pid" ]]; then
+    existing_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+  fi
   if [[ "$existing_pid" =~ ^[0-9]+$ ]] && kill -0 "$existing_pid" >/dev/null 2>&1; then
-    printf '已有换号流程正在运行 (pid %s)，请等待上一轮完成。\n' "$existing_pid" >&2
+    printf '已有账号状态操作正在运行 (pid %s)，请等待上一轮完成。\n' "$existing_pid" >&2
     exit 1
   fi
 
@@ -59,10 +69,17 @@ acquire_lock() {
   if mkdir "$LOCK_DIR" 2>/dev/null; then
     LOCK_HELD=1
     printf '%s\n' "$$" >"$LOCK_DIR/pid"
+    {
+      printf 'pid=%s\n' "$$"
+      printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      printf 'owner=codex-app-hot-switch\n'
+    } >"$LOCK_DIR/owner"
+    export CODEX_ACCOUNT_LOCK_DIR="$LOCK_DIR"
+    export CODEX_ACCOUNT_LOCK_HELD="$LOCK_DIR"
     return 0
   fi
 
-  printf '无法创建换号锁：%s\n' "$LOCK_DIR" >&2
+  printf '无法创建账号状态锁：%s\n' "$LOCK_DIR" >&2
   exit 1
 }
 

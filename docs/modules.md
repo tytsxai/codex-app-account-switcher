@@ -6,10 +6,10 @@ This document maps each important file to its responsibility, dependencies, writ
 
 | File | Responsibility | Writes |
 | --- | --- | --- |
-| `codex-app-hot-switch.sh` | Orchestrates account selection, switch, lock, and optional relaunch. | Lock directory under `~/.codex/accounts`. |
-| `codex-auth-smart-switch.sh` | Core account refresh, ranking, switching, JSON summary, and cleanup. | `~/.codex/auth.json`, `registry.json`, auth snapshots during refresh, cleanup archives. |
+| `codex-app-hot-switch.sh` | Orchestrates account selection, switch, shared lock, and optional relaunch. | Lock directory under `~/.codex/accounts`. |
+| `codex-auth-smart-switch.sh` | Core account refresh, ranking, switching, JSON summary, shared lock, and cleanup. | `~/.codex/auth.json`, `registry.json`, auth snapshots during refresh, cleanup archives. |
 | `codex-app-relaunch.sh` | Safely restarts Codex.app after auth switch. | No project data writes. |
-| `codex-auth-import-json.mjs` | Parses source JSON, refreshes tokens, validates live usage and identity, writes pool entries. | `registry.json`, `*.auth.json`, invalid source archives. |
+| `codex-auth-import-json.mjs` | Parses source JSON, refreshes tokens for real imports, validates live usage and identity, writes pool entries. | `registry.json`, `*.auth.json`, invalid source archives. |
 | `codex-auth-load-free.mjs` | Scans local folders and forwards candidate files to the importer. | Delegates writes to importer. |
 | `启动Codex换号.command` | Finder-friendly interactive launcher and maintenance menu. | Temp logs/plans, then delegates writes to scripts. |
 
@@ -69,6 +69,8 @@ A valid switchable account must have:
 
 `access_token`-only sources are rejected as `missing_refresh_token` because they cannot reliably become `~/.codex/auth.json` for Codex.app.
 
+Importer `--dry-run` does not refresh tokens or write account state. If a candidate needs refresh to validate, it is reported as `dry_run_refresh_required`; real imports require `--yes` in interactive terminals before validation begins.
+
 ### Usage Refresh
 
 `codex-auth-smart-switch.sh` checks each account through:
@@ -78,6 +80,12 @@ A valid switchable account must have:
 3. Fallback diagnostic source only when live API usage cannot be read.
 
 Only `source == "api"` can be selected. `cache`, `api_failed`, `auth_failed`, and `no_refresh_token` are diagnostics.
+
+Switcher dry-runs do not switch active auth or relaunch Codex.app. They may still persist refreshed account snapshots if live validation rotates tokens; this prevents losing the new refresh token.
+
+### Account-State Lock
+
+Mutating entrypoints share `${CODEX_ACCOUNT_LOCK_DIR:-$CODEX_HOME/accounts/.codex-app-hot-switch.lock}`. Direct switcher runs, cleanup, hot-switch orchestration, and real imports fail closed when another live owner holds the lock. Hot-switch delegates the already-held lock to the child switcher through `CODEX_ACCOUNT_LOCK_HELD`.
 
 ### Availability Rules
 
@@ -118,7 +126,7 @@ It does not delete network failures, HTTP unknown states, or usage refresh failu
 ## Change Guidelines
 
 - Keep writes atomic: write temp file, then rename.
-- Keep `--dry-run` behavior side-effect-free except for unavoidable live API reads.
+- Keep dry-run semantics explicit: import dry-run must not refresh or write; switch dry-run must not switch active auth or relaunch, but may save rotated account snapshots.
 - Keep JSON output stable for launcher and automation.
-- Add fixture coverage when ranking, filtering, stale-source handling, or cleanup rules change.
+- Add fixture coverage when ranking, filtering, stale-source handling, cleanup rules, or account-state locking changes.
 - Update docs in the same change when behavior changes.

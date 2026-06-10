@@ -8,6 +8,7 @@ const CODEX_HOME = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
 const ACCOUNTS_DIR = path.join(CODEX_HOME, 'accounts');
 const REGISTRY_FILE = path.join(ACCOUNTS_DIR, 'registry.json');
 const ACTIVE_AUTH_FILE = path.join(CODEX_HOME, 'auth.json');
+const ACCOUNT_LOCK_DIR = process.env.CODEX_ACCOUNT_LOCK_DIR || path.join(ACCOUNTS_DIR, '.codex-app-hot-switch.lock');
 const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const CURL_TIMEOUT_MS = Number(process.env.IMPORT_TIMEOUT_MS || 8000);
 const INVALID_SOURCE_ROOT = process.env.INVALID_SOURCE_ROOT || path.join(CODEX_HOME, 'accounts-invalid-sources');
@@ -15,6 +16,7 @@ const INVALID_SOURCE_ROOT = process.env.INVALID_SOURCE_ROOT || path.join(CODEX_H
 let dryRun = false;
 let yes = false;
 let onlyPlan = '';
+let accountLockHeld = false;
 const inputFiles = [];
 
 for (let i = 2; i < process.argv.length; i += 1) {
@@ -51,6 +53,8 @@ function usage() {
 Behavior:
   - Accepts codex-sub2api export JSON and codex-auth auth JSON snapshots
   - Imports only accounts whose ChatGPT usage API can be read in real time
+  - --dry-run reads live usage with existing access tokens only; it does not
+    refresh tokens or write account state
   - --only-plan <plan> imports only live accounts whose usage plan matches
     the requested plan, for example --only-plan free
   - If access_token is expired, refresh_token is used once and the rotated token
@@ -117,6 +121,82 @@ function timestamp() {
 
 function safeFileName(value) {
   return String(value || 'unknown').replace(/[^A-Za-z0-9._@-]+/g, '_').slice(0, 160);
+}
+
+function pidIsRunning(pid) {
+  if (!/^[0-9]+$/.test(String(pid || ''))) return false;
+  try {
+    process.kill(Number(pid), 0);
+    return true;
+  } catch (error) {
+    return error?.code === 'EPERM';
+  }
+}
+
+function readLockPid() {
+  try {
+    const owner = fs.readFileSync(path.join(ACCOUNT_LOCK_DIR, 'owner'), 'utf8');
+    const match = owner.match(/^pid=([0-9]+)$/m);
+    if (match) return match[1];
+  } catch {
+    // Fall through to the legacy pid file.
+  }
+  try {
+    return fs.readFileSync(path.join(ACCOUNT_LOCK_DIR, 'pid'), 'utf8').trim();
+  } catch {
+    return '';
+  }
+}
+
+function writeLockOwner(owner) {
+  fs.writeFileSync(path.join(ACCOUNT_LOCK_DIR, 'pid'), `${process.pid}\n`);
+  fs.writeFileSync(path.join(ACCOUNT_LOCK_DIR, 'owner'), [
+    `pid=${process.pid}`,
+    `started_at=${new Date().toISOString()}`,
+    `owner=${owner}`,
+    '',
+  ].join('\n'));
+}
+
+function acquireAccountLock() {
+  if (process.env.CODEX_ACCOUNT_LOCK_HELD === ACCOUNT_LOCK_DIR) return;
+
+  fs.mkdirSync(ACCOUNTS_DIR, { recursive: true });
+  try {
+    fs.mkdirSync(ACCOUNT_LOCK_DIR);
+    accountLockHeld = true;
+    writeLockOwner('codex-auth-import-json');
+    process.env.CODEX_ACCOUNT_LOCK_HELD = ACCOUNT_LOCK_DIR;
+    return;
+  } catch (error) {
+    if (error?.code !== 'EEXIST') throw error;
+  }
+
+  const existingPid = readLockPid();
+  if (pidIsRunning(existingPid)) {
+    throw new Error(`account state operation already running (pid ${existingPid})`);
+  }
+
+  fs.rmSync(ACCOUNT_LOCK_DIR, { recursive: true, force: true });
+  fs.mkdirSync(ACCOUNT_LOCK_DIR);
+  accountLockHeld = true;
+  writeLockOwner('codex-auth-import-json');
+  process.env.CODEX_ACCOUNT_LOCK_HELD = ACCOUNT_LOCK_DIR;
+}
+
+function releaseAccountLock() {
+  if (!accountLockHeld) return;
+  fs.rmSync(ACCOUNT_LOCK_DIR, { recursive: true, force: true });
+  accountLockHeld = false;
+}
+
+process.on('exit', releaseAccountLock);
+const signalExitCodes = { SIGINT: 130, SIGTERM: 143 };
+for (const signal of Object.keys(signalExitCodes)) {
+  process.on(signal, () => {
+    releaseAccountLock();
+    process.exit(signalExitCodes[signal]);
+  });
 }
 
 function authPayload(tokens, email, chatgpt_user_id, chatgpt_account_id) {
@@ -198,6 +278,8 @@ async function fetchJson(url, options) {
       body = {};
     }
     return { status: res.status, body };
+  } catch (error) {
+    return { status: 0, body: {}, error: error?.message || 'network_error' };
   } finally {
     clearTimeout(timer);
   }
@@ -217,6 +299,9 @@ async function refreshTokens(tokens) {
   });
 
   if (status !== 200 || !body?.access_token) {
+    if (status === 0) {
+      return { ok: false, status: 'refresh_network', error: body?.error || body?.message || '' };
+    }
     return { ok: false, status: `refresh_http_${status}`, error: body?.error || body?.message || '' };
   }
 
@@ -241,7 +326,7 @@ async function fetchUsage(tokens) {
     },
   });
   const usage = status === 200 ? usageFromApi(body) : null;
-  if (!usage) return { ok: false, status: `usage_http_${status}` };
+  if (!usage) return { ok: false, status: status === 0 ? 'usage_network' : `usage_http_${status}` };
   return { ok: true, usage };
 }
 
@@ -265,6 +350,14 @@ async function validateCandidate(candidate) {
   let refreshed = false;
 
   if (!usageResult.ok && tokens.refresh_token) {
+    if (dryRun) {
+      return {
+        ...candidate,
+        valid: false,
+        status: 'dry_run_refresh_required',
+        error: `live usage failed with ${usageResult.status}; rerun with --yes to refresh and persist rotated tokens`,
+      };
+    }
     const refreshResult = await refreshTokens(tokens);
     if (!refreshResult.ok) {
       return { ...candidate, valid: false, status: refreshResult.status, error: refreshResult.error || '' };
@@ -279,6 +372,14 @@ async function validateCandidate(candidate) {
   }
 
   if (!tokens.id_token) {
+    if (dryRun) {
+      return {
+        ...candidate,
+        valid: false,
+        status: 'dry_run_refresh_required',
+        error: 'id_token missing; dry-run does not refresh tokens',
+      };
+    }
     const refreshResult = await refreshTokens(tokens);
     if (!refreshResult.ok) {
       return { ...candidate, valid: false, status: refreshResult.status, error: refreshResult.error || '' };
@@ -430,6 +531,19 @@ for (const file of inputFiles) {
   }
 }
 
+if (!dryRun) {
+  if (!yes && process.stdin.isTTY) {
+    console.error('refusing to validate or write without --yes; live validation may rotate refresh tokens');
+    process.exit(1);
+  }
+  try {
+    acquireAccountLock();
+  } catch (error) {
+    console.error(`unable to acquire account state lock: ${error.message}`);
+    process.exit(1);
+  }
+}
+
 const validated = [];
 for (const candidate of candidates) {
   if (candidate.valid === false) validated.push(candidate);
@@ -450,10 +564,6 @@ const invalidAccounts = validated.filter((item) => !item.valid);
 const invalidArchiveDir = writeInvalidSourceArchive(validAccounts, invalidAccounts);
 
 if (!dryRun && validAccounts.length > 0) {
-  if (!yes && process.stdin.isTTY) {
-    console.error('refusing to write without --yes');
-    process.exit(1);
-  }
   fs.mkdirSync(ACCOUNTS_DIR, { recursive: true });
   const registry = upsertAccounts(loadRegistry(), validAccounts);
   for (const account of validAccounts) {
