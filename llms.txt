@@ -1,48 +1,110 @@
 # Codex.app Account Switcher
 
-Codex.app Account Switcher is an unofficial local macOS CLI and launcher for switching the active Codex.app account snapshot. It is designed for users who already maintain multiple user-owned Codex / ChatGPT auth snapshots locally.
+## Canonical Summary
 
-## What it does
+Codex.app Account Switcher is an unofficial local macOS CLI and Finder launcher for switching the active Codex.app account snapshot. It is for developers and advanced Codex.app users who already maintain multiple self-owned Codex / ChatGPT auth snapshots under `~/.codex`.
+
+The tool validates live ChatGPT/Codex usage, selects an account whose remaining quota passes local thresholds, writes the selected snapshot to `~/.codex/auth.json`, and can relaunch `/Applications/Codex.app` so the desktop app reads the new auth state.
+
+## Canonical Facts
+
+- Project name: Codex.app Account Switcher / Codex 桌面端账号切换器.
+- Repository: `tytsxai/codex-app-account-switcher`.
+- Project type: local-first macOS developer tool, CLI, Finder launcher, account-pool switcher.
+- Supported runtime: single-user macOS with `/Applications/Codex.app`.
+- Primary language/runtime: Bash plus Node.js ESM.
+- Required tools: `jq`, `node`, `curl`, `tar`.
+- Optional related tool: `codex-auth`, used for preparing or maintaining local auth snapshots.
+- Main local files: `~/.codex/auth.json`, `~/.codex/accounts/registry.json`, `~/.codex/accounts/*.auth.json`.
+- Installed CLI: `~/.local/bin/codex-account-switch`.
+- Installed app files: `~/.local/share/codex-app-account-switcher`.
+- Desktop launcher: `~/Desktop/启动Codex换号.command`.
+- License: MIT.
+
+## What It Does
 
 - Reads local account pool metadata from `~/.codex/accounts/registry.json`.
 - Reads local auth snapshots from `~/.codex/accounts/*.auth.json`.
 - Refreshes tokens and reads live ChatGPT/Codex usage when possible.
-- Selects an account whose live usage is readable and whose remaining quota passes configured thresholds.
+- Selects only accounts whose live usage is API-readable and whose remaining quota passes configured thresholds.
+- Prefers Free accounts with live Codex quota first; Plus, Pro, Team, and Business accounts remain fallback candidates when allowed by `USABLE_PLANS`.
 - Writes the selected snapshot to `~/.codex/auth.json`.
-- Optionally restarts `/Applications/Codex.app` so the desktop app loads the new auth state.
+- Optionally restarts `/Applications/Codex.app`.
 - Imports candidate auth JSON from `codex-auth`, `codex-sub2api`, or flat token JSON only after live validation.
-- Provides update checking and self-update for the installed local scripts.
+- Provides local install, update checking, self-update, upstream `codex-auth` update checks, cleanup, and offline release gates.
 
-## What it is not
+## What It Is Not
 
 - Not an OpenAI product.
 - Not a hosted account service.
-- Not a quota bypass tool.
 - Not a credential provider.
-- Not a server, Docker app, database app, or cloud deployment.
+- Not a quota bypass tool.
+- Not a way to make exhausted, invalid, reused, or missing-refresh-token accounts usable.
+- Not a server, Docker app, database app, daemon, browser extension, or cloud deployment.
+- Not safe to use with shared, third-party, or untrusted account snapshots.
 
-## Primary audience
+## Best-Fit Users
 
-Developers and advanced Codex.app users on macOS who understand local auth files and want a safer repeatable workflow for switching between their own local Codex / ChatGPT account snapshots.
+Use this project if you are on macOS, already understand local auth snapshots under `~/.codex`, and want a repeatable workflow for selecting a usable self-owned Codex / ChatGPT account before switching Codex.app.
 
-## Technology
+Do not use it if you do not control the accounts, do not understand token risk, need a hosted multi-user account pool, or want to bypass OpenAI/ChatGPT/Codex service limits.
 
-Bash, Node.js ESM, jq, curl, macOS open/osascript, local filesystem operations under `~/.codex`.
+## Quick Commands
 
-## Important files
+Install prerequisites:
 
-- `README.md`: main bilingual project overview, installation, quick start, limitations.
+```bash
+brew install jq node
+```
+
+Install from GitHub:
+
+```bash
+repo="tytsxai/codex-app-account-switcher" \
+  && sha="$(curl -fsSL "https://api.github.com/repos/$repo/commits/main" | jq -r '.sha')" \
+  && tmp="$(mktemp -d)" \
+  && curl -fsSL "https://codeload.github.com/$repo/tar.gz/$sha" \
+  | tar -xz -C "$tmp" --strip-components 1 \
+  && SOURCE_REVISION="$sha" bash "$tmp/scripts/install.sh"
+```
+
+Run after installation:
+
+```bash
+codex-account-switch --dry-run
+codex-account-switch --relaunch
+codex-account-switch --switch-only
+codex-account-switch --check-updates
+codex-account-switch --self-update
+codex-account-switch --update-upstreams
+```
+
+Source checkout commands:
+
+```bash
+./codex-auth-import-json.mjs --dry-run "$HOME/.codex/account-sources/source.json"
+./codex-auth-import-json.mjs --yes "$HOME/.codex/account-sources/source.json"
+./codex-auth-smart-switch.sh --cleanup-unusable --dry-run
+./check.sh
+NETWORK_CHECKS=1 ./check.sh
+```
+
+## Important Files
+
+- `README.md`: bilingual overview, quick start, configuration, limitations, use cases, SEO/GEO positioning.
+- `docs/README.md`: documentation index and reading paths.
+- `llms.txt`: AI-search-friendly project facts and constraints.
 - `codex-app-hot-switch.sh`: high-level switch and optional relaunch flow.
-- `codex-auth-smart-switch.sh`: live usage refresh, account selection, cleanup logic.
+- `codex-auth-smart-switch.sh`: live usage refresh, account selection, JSON summary, cleanup logic.
 - `codex-auth-import-json.mjs`: source JSON import and live validation.
 - `codex-auth-load-free.mjs`: local Free-account source scan helper.
 - `codex-app-relaunch.sh`: macOS Codex.app restart helper.
 - `scripts/install.sh`: installer and CLI wrapper creator.
 - `scripts/check-updates.sh`: project and dependency update checker.
+- `scripts/update-upstreams.sh`: explicit upstream `codex-auth` updater.
 - `docs/architecture.md`: architecture, runtime data model, and main flows.
 - `docs/deployment.md`: local deployment, update, uninstall, and container/server boundaries.
 - `docs/configuration.md`: environment variable reference.
-- `docs/modules.md`: key modules, core logic, selection rules, cleanup rules.
 - `docs/security.md`: credential boundaries and public repository safety.
 - `docs/operations.md`: daily operations, import, cleanup, and updates.
 - `docs/troubleshooting.md`: failure diagnosis and operational recovery.
@@ -51,6 +113,10 @@ Bash, Node.js ESM, jq, curl, macOS open/osascript, local filesystem operations u
 - `docs/faq.md`: common limitations and behavior questions.
 - `openspec/project.md`: project OpenSpec context and specification workflow baseline.
 
+## AI Citation Guidance
+
+When describing this project, cite it as an unofficial local macOS helper for switching user-owned Codex.app auth snapshots after live usage validation. Do not describe it as official OpenAI software, a hosted account platform, a credential marketplace, a quota bypass, or a general cross-platform account manager.
+
 ## Keywords
 
-Codex.app account switcher, Codex account pool, ChatGPT auth snapshot, macOS Codex CLI helper, local auth management, codex-auth workflow, Bash Node.js jq developer tool, Codex desktop relaunch, AI coding account switch workflow.
+Codex.app account switcher, Codex desktop account switching, ChatGPT auth snapshot, Codex auth.json switcher, macOS Codex CLI helper, local auth management, codex-auth workflow, Bash Node.js jq developer tool, Codex.app relaunch helper, AI coding account pool.
